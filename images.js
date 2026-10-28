@@ -3,6 +3,13 @@
  * GitHub Pages에서 Wikimedia 서버의 이미지를 직접 불러온다. 불러오지 못하면 일러스트로 대체된다.
  */
 const IMAGES = {
+  park1940: {
+    kind: 'source', title: '박흥식 (1940년 7월 7일자 매일신보에 실린 사진)', date: '1940년 7월 7일',
+    big: 'https://upload.wikimedia.org/wikipedia/ko/c/c1/%EB%B0%95%ED%9D%A5%EC%8B%9D.jpg',
+    small: 'https://upload.wikimedia.org/wikipedia/ko/c/c1/%EB%B0%95%ED%9D%A5%EC%8B%9D.jpg',
+    page: 'https://ko.wikipedia.org/wiki/%ED%8C%8C%EC%9D%BC:%EB%B0%95%ED%9D%A5%EC%8B%9D.jpg',
+    credit: '매일신보 · 한국어 위키백과 · 퍼블릭 도메인',
+  },
   hwashin: {
     kind: 'source', title: '1940년대 초 화신백화점', date: '1941년 무렵',
     big: 'https://thumb.wikimedia.org/wikipedia/commons/thumb/4/40/Whashin_Department_Store_around_early_1940s.jpg/1280px-Whashin_Department_Store_around_early_1940s.jpg',

@@ -649,3 +649,14 @@ textarea{width:100%;min-height:130px;font:16px/1.7 var(--sans);padding:14px;bord
 .substatus{margin:14px auto 0;max-width:560px;border-radius:12px;padding:10px 14px;font-weight:700;font-size:15px;display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap}
 .substatus.ok{background:#e1f2ee;color:var(--teal)}
 .substatus.no{background:#fff1e4;color:var(--orange2)}
+
+/* ===== v6: real portrait of 박흥식 ===== */
+.vn-av img.realphoto,.mug img.realphoto{width:100%;height:100%;object-fit:cover;object-position:50% 20%;filter:grayscale(1) sepia(.35) contrast(1.05)}
+.vn-av.park{background:#cdc2ab}
+.vn-av .img-fail{font-size:11px}
+.vn-cast{gap:12px}
+.avcap{align-self:flex-end;max-width:240px;font-size:11px;line-height:1.4;color:#f4ead6;background:rgba(0,0,0,.55);border-radius:8px;padding:6px 9px;margin-bottom:24px}
+.seat .vn-av img.realphoto{border-radius:0}
+.mug{background:#cdc2ab}
+.mug span{font-size:10px}
+.seatcap{display:block;font-size:10px;font-weight:500;opacity:.75}
