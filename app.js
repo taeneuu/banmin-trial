@@ -30,7 +30,7 @@ const SCREEN_TITLE = {
 const fresh = () => ({
   screen: 'title', reached: 0, done: {}, line: 0,
   organ: { matched: {}, sel: null, quiz: null },
-  trial: { round: 0, hp: TRIAL_HP, wrong: [], solved: false },
+  trial: { round: 0, hp: TRIAL_HP, wrong: [], solved: false, picked: null, sorted: {}, lastWhy: null },
   viewed: [], locker: [], current: null, cat: 'all',
   pick: [], tried: [], found: {}, lastVerdict: null, lastPair: null, missStreak: 0,
   chances: MAX_CHANCES, mistakes: [],
@@ -194,6 +194,7 @@ $('#hudBack').addEventListener('click', () => go(S.screen === 'dash' ? 'title' :
 $('#hudLocker').addEventListener('click', showLocker);
 
 function render() {
+  stopRoundTimers();
   renderHud();
   const scr = S.failed ? 'fail' : S.screen;
   const st = stepOf(scr);
@@ -206,6 +207,7 @@ function render() {
   bind();
   if (scr === 'm2') requestAnimationFrame(drawStrings);
   if (st && st.type === 'scene') startTyping();
+  if (scr === 'trial') startRoundTimers();
 }
 
 /* ---------- TITLE ---------- */
@@ -948,12 +950,12 @@ function vOrgans() {
   return `<section class="scene dash-scene">${sceneBg('ballotbox1948', 'small')}
   <div class="wrap enter">
     <div class="mhead"><div><span class="kicker">1장 · 반민특위의 탄생</span><h2>세 기관의 역할 맞추기</h2>
-      <p>왼쪽 기관을 누른 다음, 그 기관이 하는 일을 오른쪽에서 고르세요. 틀려도 괜찮아요!</p></div>
+      <p><span class="only-wide">왼쪽</span><span class="only-narrow">위쪽</span> 기관 카드를 누른 다음, 그 기관이 하는 일을 <span class="only-wide">오른쪽</span><span class="only-narrow">아래쪽</span>에서 고르세요. 틀려도 괜찮아요!</p></div>
       ${mascot(allMatched ? '모두 맞췄어요! 마지막으로 한 문제만 더!' : '조사 → 기소 → 재판, 순서를 떠올려 봐요.', 'happy', 70)}</div>
     <div class="organs">
       <div class="ocol">${ORGANS.map(o => `<button class="ocard ${O.sel === o.id ? 'sel' : ''} ${O.matched[o.id] ? 'ok' : ''}" data-organ="${o.id}" ${O.matched[o.id] ? 'disabled' : ''}>
         <span class="oi">${o.icon}</span><b>${esc(o.name)}</b>${O.matched[o.id] ? `<small>✓ ${esc(ORGAN_ROLES.find(r => r.id === o.role).text)}</small>` : ''}</button>`).join('')}</div>
-      <div class="ocol">${ORGAN_ROLES.map(r => { const used = Object.values(O.matched).includes(r.id);
+      <div class="ocol roles"><div class="ohint">${S.organ.sel ? `‘${esc(ORGANS.find(o => o.id === S.organ.sel).name)}’이(가) 하는 일은?` : '기관을 먼저 고르세요'}</div>${ORGAN_ROLES.map(r => { const used = Object.values(O.matched).includes(r.id);
         return `<button class="rcard ${used ? 'ok' : ''}" data-role="${r.id}" ${used ? 'disabled' : ''}>${esc(r.text)}<small>근거: ${esc(r.src)}</small></button>`; }).join('')}</div>
     </div>
     ${allMatched ? `<div class="paper pad quiz enter">
@@ -965,64 +967,170 @@ function vOrgans() {
     </div>` : ''}
   </div></section>`;
 }
-function pickOrgan(id) { S.organ.sel = id; save(); render(); }
+function pickOrgan(id) {
+  S.organ.sel = id; save(); render();
+  if (matchMedia('(max-width: 980px)').matches) { const r = $('.ocol.roles'); if (r) r.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+}
 function pickRole(rid) {
   const O = S.organ;
-  if (!O.sel) { toast('먼저 왼쪽에서 기관을 골라 주세요.'); return; }
+  if (!O.sel) { toast(matchMedia('(max-width: 980px)').matches ? '먼저 위쪽에서 기관을 골라 주세요.' : '먼저 왼쪽에서 기관을 골라 주세요.'); return; }
   const o = ORGANS.find(x => x.id === O.sel);
   if (o.role === rid) { O.matched[o.id] = rid; O.sel = null; save(); toast('정답!'); render(); }
   else { const b = $(`[data-role="${rid}"]`); if (b) { b.classList.remove('shake'); void b.offsetWidth; b.classList.add('shake'); } toast('다시 생각해 봐요. 이 기관이 맡은 단계는?'); }
 }
 
 /* ---------- chapter 4: trial ---------- */
+let roundTimer = null, tIdx = 0, timeLeft = null, timerRound = -1;
+function stopRoundTimers() { clearInterval(roundTimer); roundTimer = null; }
+const ORDERS = [[1, 0, 2], [2, 1, 0], [0, 2, 1], [1, 2, 0], [2, 0, 1]];
+function solvedLine(R) { return R.line || R.opts.find(o => o.ok).t; }
+function solvedReact(R) { return R.react || R.opts.find(o => o.ok).react; }
 function vTrial() {
   const T = S.trial, R = TRIAL[Math.min(T.round, TRIAL.length - 1)], c = CHARS[R.who];
+  if (timerRound !== T.round) { timerRound = T.round; tIdx = 0; timeLeft = null; }
+  const typeName = { choice: '반박 선택', evidence: '증거 제시', testimony: '증언 흔들기', timed: '제한 시간', sort: '사실·주장 가리기' }[R.type];
+  const react = solvedReact(R);
+  let body = '';
+  if (T.solved) {
+    body = `<div class="objection enter"><div class="obj-stamp">반박 성공!</div>
+      <div class="react me"><div class="vn-av sm">${AV.me()}</div><div><b>나 (특별검찰관)</b><p>${esc(solvedLine(R))}</p></div></div>
+      <div class="react"><div class="vn-av sm">${AV[CHARS[react.c].av]()}</div><div><b>${esc(CHARS[react.c].name)}</b><p>${esc(react.t)}</p></div></div>
+      <div class="row" style="justify-content:flex-end"><button class="btn orange" data-act="trialnext">${T.round >= TRIAL.length - 1 ? '구형 의견으로 →' : '다음 반박 듣기 →'}</button></div></div>`;
+  } else if (R.type === 'choice' || R.type === 'timed') {
+    body = `<h3 class="sect-title tq">${esc(R.ask)}</h3>
+      ${R.type === 'timed' ? `<div class="timer"><div class="tfill" id="tfill"></div><span id="tsec">${R.seconds}초</span></div>` : ''}
+      <div class="rebuts">${ORDERS[T.round % 5].map(i => [R.opts[i], i]).map(([o, i]) => { const w = T.wrong.includes(i);
+        return `<button class="rebut ${w ? 'wrong' : ''}" data-rebut="${i}" ${w ? 'disabled' : ''}>
+          <p>${esc(o.t)}</p>${evChips(o.ev)}${w ? `<div class="why">✗ ${esc(o.why)}</div>` : ''}</button>`; }).join('')}</div>`;
+  } else if (R.type === 'evidence') {
+    const { evs } = m2Pool();
+    body = `<h3 class="sect-title tq">${esc(R.ask)}</h3>
+      ${T.lastWhy ? `<div class="tfeed shake">✗ ${esc(T.lastWhy)}</div>` : ''}
+      <div class="evpick">${evs.map(id => { const w = T.wrong.includes(id);
+        return `<button class="bcard ${T.picked === id ? 'sel' : ''} ${w ? 'used' : ''}" data-evpick="${id}" ${w ? 'disabled' : ''}>
+          <div class="thumb" style="position:relative">${visual(id)}</div><div class="t">${esc(ev(id).title)}</div><div class="d">${esc(ev(id).period)}</div></button>`; }).join('')}</div>
+      <div class="row present"><span class="muted">${T.picked ? '고른 증거: <b>' + esc(ev(T.picked).title) + '</b>' : '증거 카드를 하나 고르세요.'}</span>
+        <button class="btn red big" data-act="present" ${T.picked ? '' : 'disabled'}>📌 증거 제시!</button></div>`;
+  } else if (R.type === 'testimony') {
+    body = `<div class="testi">
+      <div class="testi-head"><b>증언</b><span>${R.statements.map((_, i) => `<i data-dot="${i}"></i>`).join('')}</span></div>
+      <p class="testi-line" id="testiLine"></p>
+      <div class="testi-bar"><div id="testiFill"></div></div>
+    </div>
+    ${T.lastWhy ? `<div class="tfeed shake">✗ ${esc(T.lastWhy)}</div>` : ''}
+    <div class="row present"><span class="muted">문장이 차례로 지나가요. 논리가 틀린 문장일 때 누르세요!</span>
+      <button class="btn red big objbtn" data-act="object">이의 있음!</button></div>`;
+  } else if (R.type === 'sort') {
+    body = `<h3 class="sect-title tq">${esc(R.ask)}</h3>
+      ${T.lastWhy ? `<div class="tfeed shake">✗ ${esc(T.lastWhy)}</div>` : ''}
+      <div class="sorts">${R.items.map((it, i) => { const done = T.sorted && T.sorted[i];
+        return `<div class="sortrow ${done ? 'ok' : ''}"><p>${esc(it.t)}</p>
+          ${done ? `<span class="tag ${it.fact ? 'biz' : 'issue'}">${it.fact ? '확인된 사실' : '확인되지 않은 주장'}</span>`
+            : `<div class="row"><button class="btn teal small" data-sort="${i}:1">확인된 사실</button><button class="btn small" data-sort="${i}:0">확인되지 않은 주장</button></div>`}</div>`; }).join('')}</div>`;
+  }
   return `<section class="scene court-scene">${sceneBg('courthouse')}
   <div class="wrap enter">
     <div class="mhead"><div><span class="kicker">4장 · 특별재판부</span><h2>공판: 반박과 재반박</h2>
-      <p>피고 측 주장을 듣고, <b style="color:var(--gold)">증거에 근거한 재반박</b>을 고르세요.</p></div>
-      <div class="trialbar"><div class="tb-round">반박 <b>${Math.min(T.round + 1, TRIAL.length)}</b>/${TRIAL.length}</div>
+      <p>피고 측 주장을 듣고, <b style="color:var(--gold)">증거에 근거해</b> 다시 반박하세요.</p></div>
+      <div class="trialbar"><div class="tb-round">반박 <b>${Math.min(T.round + 1, TRIAL.length)}</b>/${TRIAL.length} <span class="ttype">${typeName}</span></div>
         <div class="tb-hp" title="설득력">설득력 ${Array.from({ length: TRIAL_HP }, (_, i) => `<span class="${i < T.hp ? 'on' : ''}">⚖</span>`).join('')}</div></div>
     </div>
     <div class="bench">
       <div class="seat def ${!T.solved && R.who === 'lawyer' ? 'talk' : ''}"><div class="vn-av">${AV.lawyer()}</div><span>변호인</span></div>
       <div class="seat def ${!T.solved && R.who === 'park' ? 'talk' : ''}"><div class="vn-av">${AV.park()}</div><span>피고인 박흥식</span></div>
-      <div class="seat judge ${T.solved && R.opts.find(o => o.ok).react.c === 'judge' ? 'talk' : ''}"><div class="vn-av">${AV.judge()}</div><span>재판장</span></div>
-      <div class="seat pros ${T.solved ? 'talk' : ''}"><div class="vn-av">${AV.me()}</div><span>특별검찰관 (나)</span></div>
+      <div class="seat judge ${T.solved && react.c === 'judge' ? 'talk' : ''}"><div class="vn-av">${AV.judge()}</div><span>재판장</span></div>
+      <div class="seat pros ${T.solved ? 'talk' : ''}"><div class="vn-av">${AV.me()}</div><span>검찰관 (나)</span></div>
     </div>
-    <div class="claim ${T.solved ? 'dim' : ''}">
+    ${R.type !== 'testimony' || T.solved ? `<div class="claim ${T.solved ? 'dim' : ''}">
       <div class="vn-name">${esc(c.name)}<small>${R.who === 'park' ? '피고인 · 실존 인물' : '피고 측'}</small></div>
-      <p>“${esc(R.claim)}”</p>
-      <div class="vn-src">기록 근거: ${esc(R.src)}</div>
-    </div>
-    ${T.solved ? `<div class="objection enter"><div class="obj-stamp">반박 성공!</div>
-        <div class="react"><div class="vn-av sm">${AV[CHARS[R.opts.find(o => o.ok).react.c].av]()}</div><div><b>${esc(CHARS[R.opts.find(o => o.ok).react.c].name)}</b><p>${esc(R.opts.find(o => o.ok).react.t)}</p></div></div>
-        <div class="row" style="justify-content:flex-end"><button class="btn orange" data-act="trialnext">${T.round >= TRIAL.length - 1 ? '구형 의견으로 →' : '다음 반박 듣기 →'}</button></div></div>`
-      : `<h3 class="sect-title" style="margin-top:22px">이의 있습니다! 어떻게 반박할까?</h3>
-      <div class="rebuts">${[[1, 0, 2], [2, 1, 0], [0, 2, 1], [1, 2, 0], [2, 0, 1]][T.round % 5].map(i => [R.opts[i], i]).map(([o, i]) => { const w = T.wrong.includes(i);
-        return `<button class="rebut ${w ? 'wrong' : ''}" data-rebut="${i}" ${w ? 'disabled' : ''}>
-          <p>${esc(o.t)}</p>
-          ${o.ev.length ? `<div class="evchips">${o.ev.map(e => `<span class="evchip"><span class="th">${miniVisual(e)}</span>${esc(ev(e).title)}</span>`).join('')}</div>` : '<div class="evchips"><span class="evchip none">제시할 증거 없음</span></div>'}
-          ${w ? `<div class="why">✗ ${esc(o.why)}</div>` : ''}
-        </button>`; }).join('')}</div>`}
+      <p>${R.type === 'testimony' ? esc(R.statements.map(x => x.t).join(' ')) : '“' + esc(R.claim) + '”'}</p>
+      <div class="vn-src">기록 근거: ${esc(R.src)}</div></div>`
+    : `<div class="claim"><div class="vn-name">${esc(c.name)}<small>피고 측</small></div><p style="font-size:16px">${esc(R.claim)}</p><div class="vn-src">기록 근거: ${esc(R.src)}</div></div>`}
+    ${body}
   </div></section>`;
 }
-function pickRebut(i) {
-  const T = S.trial, R = TRIAL[T.round], o = R.opts[i];
-  if (o.ok) { T.solved = true; save(); flash(); render(); return; }
-  T.wrong.push(i); T.hp -= 1; save();
-  if (T.hp > 0) { render(); const b = $(`[data-rebut="${i}"]`); if (b) b.classList.add('shake'); return; }
-  const issues = [{ text: `반박 ${T.round + 1}: “${R.claim.slice(0, 30)}…”에 근거 없는 재반박을 거듭했어요. ${o.why}` }];
+function evChips(evs) {
+  return evs.length ? `<div class="evchips">${evs.map(e => `<span class="evchip"><span class="th">${miniVisual(e)}</span>${esc(ev(e).title)}</span>`).join('')}</div>`
+    : '<div class="evchips"><span class="evchip none">제시할 증거 없음</span></div>';
+}
+function startRoundTimers() {
+  stopRoundTimers();
+  const T = S.trial, R = TRIAL[T.round];
+  if (!R || T.solved || S.screen !== 'trial') return;
+  const slow = matchMedia('(prefers-reduced-motion: reduce)').matches ? 1.5 : 1;
+  if (R.type === 'timed') {
+    const total = R.seconds * slow;
+    if (timeLeft === null) timeLeft = total;
+    const paint = () => { const f = $('#tfill'), sec = $('#tsec'); if (f) f.style.width = (timeLeft / total * 100) + '%'; if (sec) sec.textContent = Math.ceil(timeLeft) + '초'; if (f) f.classList.toggle('low', timeLeft < 5); };
+    paint();
+    roundTimer = setInterval(() => {
+      if (!$('#modal').hidden) return;
+      timeLeft -= 0.1; paint();
+      if (timeLeft <= 0) { stopRoundTimers(); timeLeft = null; loseHp('시간 초과! 재판장이 답변을 재촉했어요. 반박을 빠르게 떠올려 봐요.', '제한 시간 안에 반박하지 못했어요.'); }
+    }, 100);
+  } else if (R.type === 'testimony') {
+    const speed = R.speed * slow;
+    let t0 = performance.now();
+    const show = () => {
+      const line = $('#testiLine'); if (!line) return;
+      line.textContent = R.statements[tIdx].t; line.classList.remove('pop'); void line.offsetWidth; line.classList.add('pop');
+      $$('[data-dot]').forEach(d => d.classList.toggle('on', +d.dataset.dot === tIdx));
+    };
+    show();
+    roundTimer = setInterval(() => {
+      if (!$('#modal').hidden) { t0 = performance.now(); return; }
+      const el = performance.now() - t0, fill = $('#testiFill');
+      if (fill) fill.style.width = Math.min(100, el / speed * 100) + '%';
+      if (el >= speed) { tIdx = (tIdx + 1) % R.statements.length; t0 = performance.now(); show(); }
+    }, 50);
+  }
+}
+function loseHp(why, issueText) {
+  const T = S.trial;
+  T.hp -= 1; T.lastWhy = why; save();
+  if (T.hp > 0) { render(); const c = $('.tfeed') || $('.rebut.wrong:last-of-type'); if (c) c.classList.add('shake'); return; }
+  const R = TRIAL[T.round];
+  const issues = [{ text: `반박 ${T.round + 1}(${R.type === 'testimony' ? '증언 흔들기' : R.claim.slice(0, 24) + '…'}): ${issueText || why}` }];
   spend('trial', issues);
-  S.trial = { round: 0, hp: TRIAL_HP, wrong: [], solved: false }; save();
+  S.trial = { round: 0, hp: TRIAL_HP, wrong: [], solved: false }; timerRound = -1; save();
   if (S.failed) { render(); return; }
   failModal('bad', '재판부가 공판을 연기했어요', [{ text: '설득력을 모두 잃었어요. 첫 번째 반박부터 다시 시작해요.' }, ...issues],
     [{ text: '조사 기록 다시 보기', cls: 'ghost', fn: () => go('m1') }, { text: '공판 다시 시작', cls: 'orange', fn: render }]);
 }
+function solveRound() { const T = S.trial; T.solved = true; T.lastWhy = null; stopRoundTimers(); save(); flash(); render(); }
+function pickRebut(i) {
+  const T = S.trial, R = TRIAL[T.round], o = R.opts[i];
+  if (o.ok) { solveRound(); return; }
+  T.wrong.push(i);
+  if (R.type === 'timed') timeLeft = null;
+  loseHp(o.why);
+}
+function presentEvidence() {
+  const T = S.trial, R = TRIAL[T.round], id = T.picked;
+  if (!id) return;
+  if (id === R.answer) { solveRound(); return; }
+  T.wrong.push(id); T.picked = null;
+  loseHp((R.whyEv[id] || R.whyDefault), `‘${ev(id).title}’을(를) 제시했어요. ${R.whyEv[id] || R.whyDefault}`);
+}
+function objectNow() {
+  const T = S.trial, R = TRIAL[T.round], st = R.statements[tIdx];
+  if (st.target) { solveRound(); return; }
+  loseHp(R.whyStatement[tIdx], `“${st.t}”에 이의를 제기했어요. ${R.whyStatement[tIdx]}`);
+}
+function sortItem(i, fact) {
+  const T = S.trial, R = TRIAL[T.round], it = R.items[i];
+  if (!T.sorted) T.sorted = {};
+  if (it.fact === fact) {
+    T.sorted[i] = true; T.lastWhy = null; save();
+    if (R.items.every((_, k) => T.sorted[k])) { solveRound(); return; }
+    render(); return;
+  }
+  loseHp(it.why, `“${it.t}”를 잘못 분류했어요. ${it.why}`);
+}
 function trialNext() {
   const T = S.trial;
   if (T.round >= TRIAL.length - 1) { advance('trial'); return; }
-  T.round += 1; T.solved = false; T.wrong = []; save(); render();
+  T.round += 1; T.solved = false; T.wrong = []; T.picked = null; T.sorted = {}; T.lastWhy = null; save(); render();
 }
 
 /* ---------- events ---------- */
@@ -1052,6 +1160,8 @@ function bind() {
   $$('[data-role]', app).forEach(b => b.addEventListener('click', () => pickRole(b.dataset.role)));
   $$('[data-quiz]', app).forEach(b => b.addEventListener('click', () => { S.organ.quiz = +b.dataset.quiz; save(); render(); }));
   $$('[data-rebut]', app).forEach(b => b.addEventListener('click', () => pickRebut(+b.dataset.rebut)));
+  $$('[data-evpick]', app).forEach(b => b.addEventListener('click', () => { S.trial.picked = b.dataset.evpick; save(); render(); }));
+  $$('[data-sort]', app).forEach(b => b.addEventListener('click', () => { const [i, f] = b.dataset.sort.split(':'); sortItem(+i, f === '1'); }));
   const vb = $('#vnBox');
   if (vb) {
     vb.addEventListener('click', e => { if (!e.target.closest('button')) vnNext(); });
@@ -1080,6 +1190,8 @@ function bind() {
     else if (a === 'vnlog') vnLog();
     else if (a === 'organdone') advance('c1g');
     else if (a === 'trialnext') trialNext();
+    else if (a === 'present') presentEvidence();
+    else if (a === 'object') objectNow();
   }));
 }
 function startGame() {
