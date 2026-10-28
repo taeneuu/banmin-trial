@@ -74,9 +74,9 @@ function toast(msg) {
 function flash() { const f = $('#flash'); f.classList.remove('go'); void f.offsetWidth; f.classList.add('go'); }
 
 /* images: lazy, with fallback panel */
-function img(key, size = 'small', alt = '') {
+function img(key, size = 'small', alt = '', eager = false) {
   const im = IMAGES[key]; if (!im) return '';
-  return `<img src="${im[size]}" alt="${esc(alt || im.title)}" loading="lazy" decoding="async" data-fb="${esc(im.title)}">`;
+  return `<img src="${im[size]}" alt="${esc(alt || im.title)}" loading="${eager ? 'eager' : 'lazy'}" ${eager ? 'fetchpriority="high"' : ''} decoding="async" data-fb="${esc(im.title)}">`;
 }
 document.addEventListener('error', e => {
   const t = e.target;
@@ -88,7 +88,7 @@ document.addEventListener('error', e => {
 }, true);
 function sceneBg(key, size = 'big') {
   const im = IMAGES[key];
-  return `<div class="scene-bg" aria-hidden="true">${img(key, size, '')}</div>
+  return `<div class="scene-bg" aria-hidden="true">${img(key, size, '', true)}</div>
     <div class="photo-credit">배경 사진: ${esc(im.title)} (${esc(im.date)}) · ${esc(im.credit)}</div>`;
 }
 
@@ -903,7 +903,7 @@ function vScene(id) {
       <div class="chapter-card"><span>${ch.n}장</span><b>${esc(ch.title)}</b><em>${esc(st.title)}</em></div>
       <span class="tag illut">교육용 재구성 · 대사는 기록을 바탕으로 다시 꾸몄어요</span>
     </div>
-    ${photo ? `<figure class="vn-photo">${img(photo.photo, 'small')}<figcaption>${IMAGES[photo.photo].kind === 'source' ? '사료 사진' : '사진'}: ${esc(photo.photoNote || IMAGES[photo.photo].title + ' (' + IMAGES[photo.photo].date + ')')}</figcaption></figure>` : ''}
+    ${photo ? `<figure class="vn-photo">${img(photo.photo, 'small', '', true)}<figcaption>${IMAGES[photo.photo].kind === 'source' ? '사료 사진' : '사진'}: ${esc(photo.photoNote || IMAGES[photo.photo].title + ' (' + IMAGES[photo.photo].date + ')')}</figcaption></figure>` : ''}
     <div class="vn-cast">${!isNar ? `<div class="vn-av ${l.c}">${AV[c.av](l.mood)}</div>` : ''}</div>
     <div class="vn-box ${isNar ? 'nar' : ''}" id="vnBox" role="button" tabindex="0" aria-label="다음 대사">
       ${!isNar ? `<div class="vn-name">${esc(c.name)}${c.tag ? `<small>${esc(c.tag)}</small>` : ''}</div>` : ''}
