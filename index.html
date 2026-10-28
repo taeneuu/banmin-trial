@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>반민특위 재판정</title>
+<meta name="description" content="1949년 특별검찰관이 되어 박흥식 사건을 조사하는 한국사 역사 추리 게임">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&family=Noto+Serif+KR:wght@500;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="topbar" id="topbar" hidden>
+  <button class="brand" data-go="dash" aria-label="사건 대시보드로">반민특위 재판정</button>
+  <ol class="steps" id="steps"></ol>
+  <div class="chances" id="chances" title="보완 조사 기회"></div>
+</header>
+
+<main id="app" tabindex="-1"></main>
+
+<footer class="foot">
+  <button class="linkbtn" id="btnSources">자료 출처</button>
+  <span>·</span>
+  <button class="linkbtn" id="btnReset">처음부터 다시</button>
+  <span class="credit">제작: 이태형T(한백고)</span>
+</footer>
+
+<div class="modal" id="modal" hidden>
+  <div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <div id="modalBody"></div>
+  </div>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script src="data.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
