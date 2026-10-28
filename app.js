@@ -4,7 +4,7 @@
 (() => {
 'use strict';
 
-const KEY = 'banmin-trial-v1';
+const KEY = 'banmin-trial-v2';
 const MAX_CHANCES = 4;
 const LOCKER_MAX = 6;
 const MISSIONS = [
@@ -28,7 +28,9 @@ const SCREEN_TITLE = {
 
 /* ---------- state ---------- */
 const fresh = () => ({
-  screen: 'title', mission: 1, done: {},
+  screen: 'title', reached: 0, done: {}, line: 0,
+  organ: { matched: {}, sel: null, quiz: null },
+  trial: { round: 0, hp: TRIAL_HP, wrong: [], solved: false },
   viewed: [], locker: [], current: null, cat: 'all',
   pick: [], tried: [], found: {}, lastVerdict: null, lastPair: null, missStreak: 0,
   chances: MAX_CHANCES, mistakes: [],
@@ -42,6 +44,17 @@ function load() {
   return fresh();
 }
 function save() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} }
+const stepIdx = id => FLOW.findIndex(f => f.id === id);
+const stepOf = id => FLOW.find(f => f.id === id);
+const curId = () => (FLOW[S.reached] || FLOW[FLOW.length - 1]).id;
+const chOf = id => CHAPTERS[(stepOf(id) || FLOW[0]).ch - 1];
+function advance(id) {
+  S.done[id] = true;
+  const i = stepIdx(id);
+  S.reached = Math.max(S.reached, i + 1);
+  S.line = 0; save();
+  go(i + 1 < FLOW.length ? FLOW[i + 1].id : 'end');
+}
 
 /* ---------- helpers ---------- */
 const $ = (s, el = document) => el.querySelector(s);
@@ -145,6 +158,10 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#modal
 
 let animateNext = true;
 function go(screen, fx = true) {
+  const i = stepIdx(screen);
+  if (i > S.reached) screen = curId();
+  if (screen === 'end' && !S.done.m5) screen = 'dash';
+  if (stepOf(screen) && stepOf(screen).type === 'scene' && S.screen !== screen) S.line = 0;
   S.screen = screen; save(); animateNext = true;
   if (fx) flash();
   render();
@@ -152,6 +169,7 @@ function go(screen, fx = true) {
 }
 
 function spend(mission, issues) {
+  mission = typeof mission === 'number' ? ({ 1: 'm1', 3: 'm3', 4: 'm4' })[mission] : mission;
   S.chances -= 1;
   S.mistakes.push({ mission, issues: issues.map(i => ({ text: i.text, recheck: i.recheck || [] })) });
   if (S.chances <= 0) { S.failed = true; S.screen = 'fail'; }
@@ -163,8 +181,11 @@ const chancesLeftText = () => S.chances > 0 ? `남은 보완 조사 기회: ${S.
 function renderHud() {
   const scr = S.failed ? 'fail' : S.screen;
   $('#hud').hidden = scr === 'title';
-  const t = SCREEN_TITLE[scr] || SCREEN_TITLE.dash;
-  $('#hudTitle').innerHTML = `<small>${esc(t[0])}</small>${esc(t[1])}`;
+  const st = stepOf(scr);
+  let t;
+  if (st) { const ch = CHAPTERS[st.ch - 1]; t = [`${ch.n}장 · ${ch.title}`, st.title, ch.role]; }
+  else t = ({ dash: ['사건 대시보드', '반민 사건 제1호 · 박흥식'], end: ['사건 종결', '수사 결과'], fail: ['수사 실패', '보완이 필요해요'] })[scr] || ['', ''];
+  $('#hudTitle').innerHTML = `<small>${esc(t[0])}</small>${esc(t[1])}${t[2] ? `<span class="rolebadge">${esc(t[2])}</span>` : ''}`;
   $('#hudChances').innerHTML = Array.from({ length: MAX_CHANCES }, (_, i) => `<span class="mg ${i < S.chances ? '' : 'used'}">🔍</span>`).join('');
   $('#hudChances').title = chancesLeftText();
   $('#hudCount').textContent = `${S.locker.length}/${LOCKER_MAX}`;
@@ -175,18 +196,21 @@ $('#hudLocker').addEventListener('click', showLocker);
 function render() {
   renderHud();
   const scr = S.failed ? 'fail' : S.screen;
-  const v = { title: vTitle, dash: vDash, m1: vM1, m2: vM2, m3: vM3, m4: vM4, m5: vM5, end: vEnd, fail: vFail }[scr] || vDash;
+  const st = stepOf(scr);
+  const v = st ? ({ scene: () => vScene(scr), organs: vOrgans, trial: vTrial, m1: vM1, m2: vM2, m3: vM3, m4: vM4, m5: vM5 })[st.type]
+    : ({ title: vTitle, dash: vDash, end: vEnd, fail: vFail }[scr] || vDash);
   app.innerHTML = v();
   if (!animateNext) $$('.enter', app).forEach(el => el.classList.remove('enter'));
   animateNext = false;
   document.body.dataset.screen = scr;
   bind();
   if (scr === 'm2') requestAnimationFrame(drawStrings);
+  if (st && st.type === 'scene') startTyping();
 }
 
 /* ---------- TITLE ---------- */
 function vTitle() {
-  const started = S.viewed.length > 0 || S.done[1];
+  const started = S.reached > 0 || S.line > 0;
   return `<section class="scene title-scene">${sceneBg('hwashin')}
   <div class="wrap title-wrap enter">
     <div>
@@ -200,7 +224,7 @@ function vTitle() {
       <div class="casechips">
         <div>사건 기록<b>반민특위 검거 제1호</b></div>
         <div>조사 대상<b>박흥식</b></div>
-        <div>사건 상태<b>${S.done[5] ? '종결' : (started ? '수사 중' : '수사 개시 전')}</b></div>
+        <div>사건 상태<b>${S.done.m5 ? '종결' : (started ? '수사 중' : '수사 개시 전')}</b></div>
       </div>
     </div>
     <div class="title-right">
@@ -217,22 +241,28 @@ function vTitle() {
 
 /* ---------- DASHBOARD ---------- */
 function vDash() {
-  const cur = MISSIONS.find(m => m.n === S.mission);
-  const doneN = MISSIONS.filter(m => S.done[m.n]).length;
-  const barW = `calc((100% - 44px) * ${doneN >= 5 ? 1 : (S.mission - 1) / 4})`;
+  const cur = FLOW[S.reached] || FLOW[FLOW.length - 1];
+  const curCh = CHAPTERS[cur.ch - 1];
+  const doneSteps = FLOW.filter(f => S.done[f.id]).length;
   return `<section class="scene dash-scene">${sceneBg('seoul1945')}
   <div class="wrap dash enter">
     <div>
       <div class="paper mission-card pin">
-        <span class="kicker">현재 미션</span>
-        <h2>${cur.n}. ${esc(cur.title)}</h2>
-        <p class="sub">${esc(cur.desc)}</p>
-        <div class="track"><div class="bar" style="width:${barW}"></div>
-          ${MISSIONS.map(m => `<div class="st ${S.done[m.n] ? 'done' : (S.mission === m.n ? 'now' : '')}"><i>${S.done[m.n] ? '✓' : m.n}</i>${esc(m.short)}</div>`).join('')}
+        <span class="kicker">지금 할 일 · ${curCh.n}장</span>
+        <h2>${esc(curCh.title)}</h2>
+        <p class="sub">${esc(curCh.desc)}</p>
+        <div class="track chtrack"><div class="bar" style="width:calc((100% - 44px) * ${S.done.m5 ? 1 : (cur.ch - 1) / 3})"></div>
+          ${CHAPTERS.map(c => { const steps = FLOW.filter(f => f.ch === c.n); const all = steps.every(f => S.done[f.id]);
+            return `<div class="st ${all ? 'done' : (cur.ch === c.n ? 'now' : '')}"><i>${all ? '✓' : c.n}</i>${esc(c.title)}</div>`; }).join('')}
         </div>
-        <div class="row" style="margin-top:22px">
-          <button class="btn orange" data-go="m${S.mission}">MISSION ${S.mission} ${S.mission === 1 && !S.viewed.length ? '시작하기' : '계속하기'} →</button>
-          ${S.mission > 1 ? '<button class="btn ghost" data-go="m1">사건 파일 다시 보기</button>' : ''}
+        <ol class="steplist">${FLOW.filter(f => f.ch === cur.ch).map(f => {
+          const i = stepIdx(f.id), st = S.done[f.id] ? 'done' : (i === S.reached ? 'now' : (i > S.reached ? 'lock' : ''));
+          return `<li class="${st}"><button ${i > S.reached ? 'disabled' : `data-go="${f.id}"`}><span>${S.done[f.id] ? '✓' : (f.type === 'scene' ? '💬' : '🎯')}</span>${esc(f.title)}${f.type === 'scene' ? '<small>대화</small>' : '<small>미션</small>'}</button></li>`;
+        }).join('')}</ol>
+        <div class="row" style="margin-top:18px">
+          ${S.done.m5 ? '<button class="btn orange" data-go="end">수사 결과 보기 →</button>'
+            : `<button class="btn orange" data-go="${cur.id}">${S.reached === 0 && !S.line ? '1장 시작하기' : `이어서: ${esc(cur.title)}`} →</button>`}
+          ${S.done.m1 ? '<button class="btn ghost" data-go="m1">조사 기록 다시 보기</button>' : ''}
         </div>
       </div>
       <div class="paper suspect tape">
@@ -252,28 +282,33 @@ function vDash() {
     <div class="side">
       <div class="note">
         <h3>진행 상황</h3>
-        <div class="stat-line">수집한 증거 <b>${S.locker.length}/${LOCKER_MAX}</b></div>
-        <div class="stat-line">열람한 자료 <b>${S.viewed.length}</b></div>
-        <div class="stat-line">완료한 미션 <b>${doneN}/5</b></div>
+        <div class="stat-line">지금 나의 역할 <b style="font-size:17px">${esc(curCh.role)}</b></div>
+        <div class="stat-line">채택한 증거 <b>${S.locker.length}/${LOCKER_MAX}</b></div>
+        <div class="stat-line">완료한 단계 <b>${doneSteps}/${FLOW.length}</b></div>
         <div class="stat-line" style="border:0">보완 조사 기회 <b>${S.chances}</b></div>
       </div>
-      <button class="folder-btn" data-go="m1" aria-label="사건 파일 열람하기">
-        <div class="fold"><div style="font:700 13px var(--serif)">反民 事件 第1號</div><h3>사건 파일</h3>
-          <div style="font-weight:700;margin-top:6px">열람하기 →</div>
-          <div class="seal">${img('seal', 'small', '반민특위 위원장 인장')}</div></div>
-      </button>
+      <div class="paper pad orgchart">
+        <h3>반민특위의 세 기관</h3>
+        <div class="org ${cur.ch === 2 ? 'on' : ''}"><b>🔍 특별조사위원회</b>조사 → 조사보고서</div>
+        <div class="org ${cur.ch === 3 ? 'on' : ''}"><b>📜 특별검찰부</b>기소 → 기소장</div>
+        <div class="org ${cur.ch === 4 ? 'on' : ''}"><b>⚖ 특별재판부</b>공판 → 판결</div>
+      </div>
       ${mascot(dashHint(), 'happy', 80)}
     </div>
   </div></section>`;
 }
 function dashHint() {
+  const t = (FLOW[S.reached] || {}).type;
   return ({
-    1: '사건 파일을 열어 자료를 하나씩 읽어 봐요. 혐의와 <b>관계없는 자료</b>도 섞여 있어요!',
-    2: '수집한 증거를 보드에 붙이고, 두 장씩 <b>연결</b>해 봐요.',
-    3: '이제 기소장을 쓸 차례예요. <b>조문의 문구</b>와 피의자의 행위가 딱 맞는지 확인해요.',
-    4: '법정에 들어갈 시간이에요. 형벌은 <b>법에 정해진 범위</b> 안에서만!',
-    5: '1949년의 실제 재판은 어떻게 끝났을까요?',
-  })[S.mission] || '';
+    scene: '대화를 따라가며 이야기를 확인해요. 말풍선을 누르면 다음 대사로 넘어가요.',
+    organs: '세 기관이 각각 무슨 일을 했는지 짝을 맞춰 봐요.',
+    m1: '자료를 하나씩 읽어 봐요. 혐의와 <b>관계없는 자료</b>도 섞여 있어요!',
+    m2: '수사 보드에서 두 장씩 <b>연결</b>해 혐의를 세워요.',
+    m3: '<b>조문의 문구</b>와 피의자의 행위가 딱 맞는지 확인해요.',
+    trial: '피고 측 반박에 <b>증거로</b> 맞서요. 근거 없는 말은 설득력을 깎아요.',
+    m4: '형벌은 <b>법에 정해진 범위</b> 안에서만!',
+    m5: '1949년의 실제 재판은 어떻게 끝났을까요?',
+  })[t] || '수사를 마쳤어요. 기록을 다시 볼 수 있어요.';
 }
 function suspectSVG() {
   return '<svg viewBox="0 0 90 120"><rect width="90" height="120" fill="#cbbd9f"/><g stroke="#b3a585" stroke-width="1">' +
@@ -283,18 +318,18 @@ function suspectSVG() {
 
 /* ---------- MISSION 1 : desk ---------- */
 function vM1() {
-  const items = stageItems(S.done[1] ? 2 : 1);
+  const items = stageItems(S.done.m1 ? 2 : 1);
   const counts = { all: items.length };
   items.forEach(id => { const c = EVIDENCE_VISUAL[id].cat; counts[c] = (counts[c] || 0) + 1; });
   const shown = items.filter(id => S.cat === 'all' || EVIDENCE_VISUAL[id].cat === S.cat);
-  const first = !S.viewed.length && !S.done[1];
+  const first = !S.viewed.length && !S.done.m1;
   return `<section class="scene desk-scene">${sceneBg('office1943')}
   <div class="wrap enter">
     <div class="mhead">
-      <div><span class="kicker">MISSION 1</span><h2>사건 파일: 수사 개시</h2>
-        <p>자료 카드를 눌러 자세히 읽고, 혐의를 입증할 자료만 <b style="color:var(--gold)">증거로 채택</b>하세요.</p></div>
-      ${mascot(first ? '<span class="tag illut">교육용 재구성</span><br>1949년 1월, 화신 사장 박흥식이 체포됐어요. 이 사건은 검찰관님 담당이에요!'
-        : (S.done[1] ? '추가 자료 3건이 도착했어요. MISSION 2에서 함께 써요.' : '관련 없는 자료를 넣으면 보고서가 반려돼요. 신중하게!'), 'happy', 70)}
+      <div><span class="kicker">2장 · 특별조사위원회</span><h2>조사 기록 수집</h2>
+        <p>특위 조사관이 되어 자료 카드를 읽고, 혐의를 입증할 자료만 <b style="color:var(--gold)">증거로 채택</b>하세요. 다 모으면 조사보고서를 송치해요.</p></div>
+      ${mascot(first ? '박흥식이 일제강점기에 무엇을 했는지 기록으로 확인해요. 관계없는 자료도 섞여 있어요!'
+        : (S.done.m1 ? '이미 송치한 조사 기록이에요. 추가 자료 3건도 함께 있어요.' : '관련 없는 자료를 넣으면 조사보고서가 반려돼요. 신중하게!'), 'happy', 70)}
     </div>
     <div class="tabs">${CATS.filter(c => counts[c.id]).map(c => `<button class="${S.cat === c.id ? 'on' : ''}" data-cat="${c.id}">${c.name}<span>${counts[c.id]}</span></button>`).join('')}</div>
     <div class="evgrid">
@@ -310,13 +345,13 @@ function vM1() {
     </div>
   </div></section>
   <div class="tray"><div class="tray-in">
-    <h4>증거 보관함 ${S.locker.length}/${LOCKER_MAX}<small>${S.done[1] ? '수사 보고 승인 완료' : '카드를 열어 채택하세요'}</small></h4>
+    <h4>증거 보관함 ${S.locker.length}/${LOCKER_MAX}<small>${S.done.m1 ? '조사보고서 송치 완료' : '카드를 열어 채택하세요'}</small></h4>
     <div class="slots">
-      ${S.locker.map(id => `<div class="slot full" title="${esc(ev(id).title)}"><div class="mini">${miniVisual(id)}</div><div class="cap">${esc(ev(id).title)}</div>${S.done[1] ? '' : `<button class="x" data-remove="${id}" aria-label="빼기">×</button>`}</div>`).join('')}
+      ${S.locker.map(id => `<div class="slot full" title="${esc(ev(id).title)}"><div class="mini">${miniVisual(id)}</div><div class="cap">${esc(ev(id).title)}</div>${S.done.m1 ? '' : `<button class="x" data-remove="${id}" aria-label="빼기">×</button>`}</div>`).join('')}
       ${Array.from({ length: Math.max(0, LOCKER_MAX - S.locker.length) }, () => '<div class="slot"></div>').join('')}
     </div>
-    ${S.done[1] ? `<button class="btn orange" data-go="m${S.mission}">MISSION ${S.mission} →</button>`
-      : `<button class="btn orange" data-act="m1submit" ${S.locker.length ? '' : 'disabled'}>수사 보고</button>`}
+    ${S.done.m1 ? `<button class="btn orange" data-go="${curId()}">이어서 하기 →</button>`
+      : `<button class="btn orange" data-act="m1submit" ${S.locker.length ? '' : 'disabled'}>조사보고서 송치</button>`}
   </div></div>`;
 }
 function miniVisual(id) {
@@ -330,7 +365,7 @@ function openViewer(id) {
   const im = v.img ? IMAGES[v.img] : null;
   const cap = im ? `<div class="vcap"><span class="tag ${im.kind === 'source' ? 'src' : 'refimg'}">${im.kind === 'source' ? '사료 사진' : '참고 이미지'}</span> ${esc(im.title)} (${esc(im.date)})<br>${im.note ? esc(im.note) + '<br>' : ''}<span style="opacity:.75">${esc(im.credit)}</span></div>`
     : '<div class="vcap"><span class="tag illut">일러스트</span> 자료 유형을 나타낸 그림이에요. 실제 자료 사진이 아니에요.</div>';
-  const canAdd = !S.done[1] && S.screen === 'm1';
+  const canAdd = !S.done.m1 && S.screen === 'm1';
   const btns = [];
   if (canAdd) btns.push(inL ? { text: '보관함에서 빼기', cls: 'ghost', fn: () => { S.locker = S.locker.filter(x => x !== id); save(); render(); } }
     : { text: '📌 증거로 채택', cls: 'orange', fn: () => adopt(id) });
@@ -338,7 +373,7 @@ function openViewer(id) {
   modal(`<div class="viewer">
       <div><div class="vimg">${v.img ? img(v.img, 'big') : illu(v.illu)}</div>${cap}</div>
       <div>
-        <div class="row" style="gap:6px"><span class="tag ${v.cat}">${CAT_NAME[v.cat]}</span><span class="tag etc">${esc(e.kind)}</span>${S.done[1] ? `<span class="tag ${ROLE_TAG[e.role][0]}">${ROLE_TAG[e.role][1]}</span>` : ''}</div>
+        <div class="row" style="gap:6px"><span class="tag ${v.cat}">${CAT_NAME[v.cat]}</span><span class="tag etc">${esc(e.kind)}</span>${S.done.m1 ? `<span class="tag ${ROLE_TAG[e.role][0]}">${ROLE_TAG[e.role][1]}</span>` : ''}</div>
         <h2>${esc(e.title)}</h2>
         <div class="meta">작성 시기: ${esc(e.period)}</div>
         <div class="vfield key"><div class="lb">핵심 내용</div>${esc(e.content)}</div>
@@ -395,14 +430,14 @@ function submitM1() {
   if (!L.includes('E6') && !L.includes('E7')) issues.push({ text: '전쟁 협력을 보여 주는 다른 행적(단체 활동이나 기고문)이 하나도 없어요.', recheck: ['E6', 'E7'] });
   L.filter(id => ev(id).role === 'noise').forEach(id => issues.push({ text: `‘${ev(id).title}’은(는) 혐의 입증과 관련이 낮아요. ${ev(id).caution}`, recheck: [id] }));
   if (!issues.length) {
-    S.done[1] = true; S.mission = 2; save();
-    winModal('보고 승인', '핵심 증거 확보!', '<p class="sub">특별조사위원회에서 <b>추가 자료 3건</b>(비행기공업학교, 생산 실적, 군수 보상금)을 보냈어요. 다음 미션에서 함께 써요.</p>', ['MISSION 2로 →', () => go('m2')]);
+    save();
+    winModal('송치 승인', '조사보고서 완성!', '<p class="sub">핵심 증거가 모였어요. 조사 과정에서 찾은 <b>추가 자료 3건</b>(비행기공업학교, 생산 실적, 군수 보상금)도 함께 특별검찰부로 넘어가요.</p>', ['다음 →', () => advance('m1')]);
     return;
   }
   spend(1, issues);
   if (S.failed) { render(); return; }
   $('.tray') && $('.tray').classList.add('shake');
-  failModal('bad', '보고서가 반려됐어요', issues, [{ text: '다시 조사하기', fn: render }]);
+  failModal('bad', '조사보고서가 반려됐어요', issues, [{ text: '다시 조사하기', fn: render }]);
 }
 
 /* ---------- MISSION 2 : investigation board ---------- */
@@ -415,7 +450,7 @@ function vM2() {
   const pk = S.pick, lv = S.lastVerdict;
   return `<section class="scene board-scene">${sceneBg('jongno1936')}
   <div class="wrap enter">
-    <div class="mhead"><div><span class="kicker">MISSION 2</span><h2>증거 조합: 연결되는 단서</h2>
+    <div class="mhead"><div><span class="kicker">3장 · 특별검찰부</span><h2>증거 조합: 연결되는 단서</h2>
       <p>보드의 카드 두 장을 골라 <b style="color:var(--gold)">연결 추론</b>을 눌러요. 👁 버튼으로 자료를 다시 볼 수 있어요.</p></div></div>
     <div class="board-layout">
       <div class="cork" id="cork">
@@ -503,10 +538,10 @@ function doCombine() {
   const res = $('.result'); if (res && !['valid', 'plus', 'issue'].includes(r.v)) res.classList.add('shake');
 }
 function submitM2() {
-  S.done[2] = true; S.mission = 3; save();
+  save();
   winModal('혐의 정리', '기소할 준비가 됐어요!', `<p class="sub">핵심 혐의와 보조 혐의를 뒷받침할 연결을 찾았어요.</p>
     ${S.found.ISSUE ? '<div class="notice"><b>기억할 쟁점</b> 생산 실적이 연습기 1기뿐이라는 점은 변호인이 반박 근거로 쓸 거예요.</div>' : '<div class="notice"><b>놓친 쟁점</b> 추가 자료 중 피고 측에 유리한 자료가 있어요. 결말에서 확인해 봐요.</div>'}`,
-    ['MISSION 3로 →', () => go('m3')]);
+    ['기소장 쓰러 가기 →', () => advance('m2')]);
 }
 
 /* ---------- MISSION 3 : typewriter indictment ---------- */
@@ -516,7 +551,7 @@ function vM3() {
   const st = [!!I.main, I.ev.length > 0, !!I.reason];
   return `<section class="scene type-scene">${sceneBg('typewriter')}
   <div class="wrap enter">
-    <div class="mhead"><div><span class="kicker">MISSION 3</span><h2>기소장 작성: 법적 책임을 입증하라</h2>
+    <div class="mhead"><div><span class="kicker">3장 · 특별검찰부</span><h2>기소장 작성: 법적 책임을 입증하라</h2>
       <p>선택한 내용이 기소장에 바로 타이핑돼요. 다 고르면 <b style="color:var(--gold)">기소장 제출</b>!</p></div></div>
     <div class="ind-layout">
       <ol class="steps-v">
@@ -583,11 +618,11 @@ function submitM3() {
   if (r && !r.ok) issues.push({ text: `기소 이유: ${r.why}`, recheck: [] });
 
   if (!issues.length) {
-    S.done[3] = true; S.mission = 4; save();
+    save();
     $('#bigStamp').classList.add('in');
     setTimeout(() => winModal('기소 수리', '타당한 기소!', `<p class="sub">증거와 조항이 논리적으로 연결됐어요. 특별재판부가 기소장을 받아들였어요.</p>
       ${I.ev.includes('E4') ? '<div class="notice"><b>참고</b> 생산 실적 자료도 증거로 냈어요. 이 자료는 오히려 변호인이 쓰기 좋은 자료예요.</div>' : ''}`,
-      ['법정으로 →', () => go('m4')]), 650);
+      ['다음 →', () => advance('m3')]), 650);
     return;
   }
   const lawErr = issues.some(i => /조항|제2조|제3조|중추원/.test(i.text));
@@ -608,11 +643,11 @@ function vM4() {
   const need = T.type === 'prison' || T.type === 'civil';
   return `<section class="scene court-scene">${sceneBg('courthouse')}
   <div class="wrap enter">
-    <div class="mhead"><div><span class="kicker">MISSION 4</span><h2>구형 의견: 어떤 형벌을 제안할까?</h2>
+    <div class="mhead"><div><span class="kicker">4장 · 특별재판부</span><h2>구형 의견: 어떤 형벌을 제안할까?</h2>
       <p>검찰관이 재판부에 요청하는 형벌이 <b style="color:var(--gold)">구형</b>이에요. 최종 판결은 재판부가 따로 내려요.</p></div></div>
     <div class="court-top">
       <div class="speech"><div class="who">재판장 <span class="tag illut">교육용 재구성</span></div>
-        피고인 박흥식에 대한 공판을 계속합니다. 특별검찰관은 확인된 혐의에 따라 구형 의견을 진술하십시오.</div>
+        양측의 주장을 모두 들었습니다. 특별검찰관은 확인된 혐의에 따라 구형 의견을 진술하십시오.</div>
       <figure class="court-photo" style="margin:0">${img('trial1949', 'small', '1949년 반민특위 재판 광경')}<figcaption>사료 사진: 1949년 반민특위 재판 광경 · 퍼블릭 도메인</figcaption></figure>
     </div>
     <div class="court-panel">
@@ -667,9 +702,9 @@ function submitM4() {
   const r = SENT_REASONS.find(x => x.id === T.reason);
   if (r && !r.ok) issues.push({ text: `구형 이유: ${r.why}` });
   if (!issues.length) {
-    S.done[4] = true; S.mission = 5; save();
+    save();
     winModal('구형 완료', '법정형 범위 안의 구형', `<p class="sub">당신의 구형: <b>${esc(sentenceText())}</b></p>
-      <div class="notice"><b>잠깐!</b> 구형은 검찰관의 의견일 뿐이에요. 1949년 실제 재판은 어떻게 끝났을까요?</div>`, ['역사의 결말 보기 →', () => go('m5')]);
+      <div class="notice"><b>잠깐!</b> 구형은 검찰관의 의견일 뿐이에요. 1949년 실제 재판은 어떻게 끝났을까요?</div>`, ['그 후의 역사 →', () => advance('m4')]);
     return;
   }
   spend(4, issues);
@@ -683,7 +718,7 @@ function vM5() {
   const I = S.ind; const hl = ['1949.1.8', '1949.9.26', '1951.2.14'];
   return `<section class="scene end-scene">${sceneBg('street1946')}
   <div class="wrap enter">
-    <div class="mhead"><div><span class="kicker">MISSION 5</span><h2>역사의 결말: 실제 재판과 비교</h2>
+    <div class="mhead"><div><span class="kicker">4장 · 에필로그</span><h2>역사의 결말: 실제 재판과 비교</h2>
       <p>게임 속 기소는 교육용 시나리오예요. 1949년에는 실제로 무슨 일이 있었을까요?</p></div></div>
     <article class="extra">
       <div class="mast"><h2>역사 기록</h2><div><span>교육용으로 다시 꾸민 지면</span><span>1949년 9월 26일 공판</span><span>출처는 기사 아래</span></div></div>
@@ -748,7 +783,7 @@ function submitM5() {
   const t = ($('#reflect').value || '').trim();
   S.reflection = t; save();
   if (t.length < 20) { toast('20자 이상 써야 제출할 수 있어요.'); $('#reflect').classList.add('shake'); return; }
-  S.done[5] = true; save(); go('end');
+  S.done.m5 = true; S.reached = FLOW.length - 1; save(); go('end');
 }
 function summaryText() {
   const I = S.ind;
@@ -777,7 +812,7 @@ function vEnd() {
         <dt>증거</dt><dd>${I.ev.map(id => esc(ev(id).title)).join('<br>')}</dd>
         <dt>기소 이유</dt><dd>${esc((REASONS.find(r => r.id === I.reason) || {}).text || '')}</dd>
         <dt>구형</dt><dd>${esc(sentenceText())}</dd>
-        <dt>미션 결과</dt><dd>${MISSIONS.map(m => `${m.n}. ${m.short} ${S.done[m.n] ? '✓' : '—'}${S.mistakes.filter(x => x.mission === m.n).length ? ` (보완 조사 ${S.mistakes.filter(x => x.mission === m.n).length}번)` : ''}`).join(' · ')}</dd>
+        <dt>장별 결과</dt><dd>${CHAPTERS.map(c => `${c.n}장 ${c.title} ${FLOW.filter(f => f.ch === c.n).every(f => S.done[f.id]) ? '✓' : '—'}`).join('<br>')}${S.mistakes.length ? `<br><span class="muted">보완 조사 ${S.mistakes.length}번 사용</span>` : ''}</dd>
         <dt>나의 답변</dt><dd style="white-space:pre-wrap">${esc(S.reflection)}</dd>
       </dl>
       <div class="big-stamp in" style="bottom:30px">起訴</div>
@@ -798,7 +833,7 @@ function vFail() {
         <h2 class="mt">보완 조사 기회를 모두 썼어요</h2><p class="sub">핵심 혐의를 입증하지 못해 사건이 종결됐어요. 무엇이 부족했는지 보고 다시 도전해요!</p></div></div>
       ${[...new Set(S.mistakes.map(m => m.mission))].map(n => {
         const texts = [...new Set(S.mistakes.filter(m => m.mission === n).flatMap(m => m.issues.map(i => i.text)))];
-        return `<h3 style="margin-top:16px;font:400 20px var(--display);color:var(--navy)">MISSION ${n}에서 부족했던 점</h3>${fixList(texts.map(t => ({ text: t })))}`;
+        return `<h3 style="margin-top:16px;font:400 20px var(--display);color:var(--navy)">‘${esc((stepOf(n) || { title: n }).title)}’에서 부족했던 점</h3>${fixList(texts.map(t => ({ text: t })))}`;
       }).join('')}
       ${rechecks.length ? `<h3 style="margin-top:18px;font:400 20px var(--display);color:var(--navy)">다시 확인할 자료</h3>
         <div class="bcards" style="margin-top:10px">${rechecks.map(id => `<div class="bcard"><div class="thumb" style="position:relative">${visual(id)}</div><div class="t">${esc(ev(id).title)}</div><div class="d">${esc(ev(id).period)}</div></div>`).join('')}</div>` : ''}
@@ -827,12 +862,175 @@ function showRecords() {
     <p class="muted" style="margin-top:12px">플레이어가 맡는 특별검찰관은 가상의 인물이에요. 실제 박흥식 사건은 노일환, 이후 정광호 특별검찰관이 맡았어요.</p>`, [{ text: '닫기' }]);
 }
 
+/* ---------- portraits ---------- */
+function bust(o) {
+  const face = `<circle cx="50" cy="42" r="20" fill="${o.skin || '#f0c9a0'}"/>`;
+  const hair = o.hair ? `<path d="${o.hair}" fill="${o.hairc || '#2b2620'}"/>` : '';
+  const hat = o.hat ? `<path d="M24 32h52l-6-4H30z" fill="${o.hat}"/><path d="M32 30q2-16 18-16t18 16z" fill="${o.hat}"/><rect x="32" y="26" width="36" height="4" fill="#00000033"/>` : '';
+  const eyes = o.glasses ? '<circle cx="42" cy="43" r="5" fill="none" stroke="#2b2620" stroke-width="2"/><circle cx="58" cy="43" r="5" fill="none" stroke="#2b2620" stroke-width="2"/><path d="M47 43h6" stroke="#2b2620" stroke-width="2"/><circle cx="42" cy="43" r="1.6" fill="#2b2620"/><circle cx="58" cy="43" r="1.6" fill="#2b2620"/>'
+    : '<circle cx="42" cy="43" r="2.2" fill="#2b2620"/><circle cx="58" cy="43" r="2.2" fill="#2b2620"/>';
+  const mouth = '<path d="M44 52q6 3 12 0" stroke="#7a4a33" stroke-width="2" fill="none" stroke-linecap="round"/>';
+  const body = `<path d="M14 100q4-30 36-32q32 2 36 32z" fill="${o.suit}"/><path d="M42 68l8 12 8-12" fill="#fff"/><path d="M48 70h4l2 18h-8z" fill="${o.tie || '#8a2e25'}"/>`;
+  return `<svg viewBox="0 0 100 100">${body}${o.armband ? '<rect x="18" y="80" width="16" height="8" rx="2" fill="#c9a227"/><text x="26" y="87" font-size="7" text-anchor="middle" font-weight="900" fill="#3a2610">特</text>' : ''}${face}${hair}${hat}${eyes}${mouth}</svg>`;
+}
+const AV = {
+  me: () => bust({ suit: '#27395a', hair: 'M30 38q0-20 20-20t20 20q-4-10-20-10t-20 10z', tie: '#e8742a' }),
+  senior: () => bust({ suit: '#4a4036', hair: 'M30 38q0-20 20-20t20 20q-6-12-20-12t-20 12z', hairc: '#8a8378', glasses: true, tie: '#2e7d76' }),
+  inv: () => bust({ suit: '#5b4a33', hat: '#3a2f26', armband: true, tie: '#3a2f26' }),
+  judge: () => bust({ suit: '#1e1e22', hair: 'M30 38q0-20 20-20t20 20q-6-12-20-12t-20 12z', hairc: '#d9d4cb', tie: '#1e1e22' }),
+  lawyer: () => bust({ suit: '#6b6f78', hair: 'M30 36q2-18 20-18t20 18q-8-6-20-6t-20 6z', glasses: true, tie: '#5d7f9d' }),
+  park: () => '<svg viewBox="0 0 100 100"><path d="M14 100q4-30 36-32q32 2 36 32z" fill="#4b443c"/><circle cx="50" cy="42" r="20" fill="#5e5446"/><text x="50" y="50" font-size="22" text-anchor="middle" font-weight="900" fill="#b8ab92">?</text></svg>',
+  nar: () => '<svg viewBox="0 0 100 100"><rect x="22" y="18" width="56" height="66" rx="4" fill="#f3e6c6" stroke="#6b5530" stroke-width="3"/><path d="M32 34h36M32 46h36M32 58h24" stroke="#9a8460" stroke-width="4"/><path d="M70 62l12-26 6 3-12 26-8 4z" fill="#a33a2b"/></svg>',
+  nuri: mood => mascotSVG(mood || 'happy'),
+};
+
+/* ---------- dialogue scenes ---------- */
+function lineText(l) {
+  if (l.t !== '@REASON') return l.t;
+  const r = (REASONS.find(x => x.id === S.ind.reason) || REASONS[0]).text;
+  const laws = [S.ind.main, ...S.ind.extra].filter(Boolean).map(id => LAWS[id].short).join(', ') || '제4조 7호';
+  return `${r.replace(/^피의자는/, '피고인 박흥식은')} 이에 반민족행위처벌법 ${laws} 위반으로 기소합니다.`;
+}
+function vScene(id) {
+  const sc = SCENES[id], st = stepOf(id), ch = CHAPTERS[st.ch - 1];
+  const i = Math.min(S.line, sc.lines.length - 1), l = sc.lines[i], c = CHARS[l.c];
+  const last = i >= sc.lines.length - 1;
+  const photo = [...sc.lines.slice(0, i + 1)].reverse().find(x => x.photo);
+  const isNar = l.c === 'nar';
+  return `<section class="scene vn-scene">${sceneBg(sc.bg)}
+  <div class="wrap vn enter">
+    <div class="vn-top">
+      <div class="chapter-card"><span>${ch.n}장</span><b>${esc(ch.title)}</b><em>${esc(st.title)}</em></div>
+      <span class="tag illut">교육용 재구성 · 대사는 기록을 바탕으로 다시 꾸몄어요</span>
+    </div>
+    ${photo ? `<figure class="vn-photo">${img(photo.photo, 'small')}<figcaption>${IMAGES[photo.photo].kind === 'source' ? '사료 사진' : '사진'}: ${esc(photo.photoNote || IMAGES[photo.photo].title + ' (' + IMAGES[photo.photo].date + ')')}</figcaption></figure>` : ''}
+    <div class="vn-cast">${!isNar ? `<div class="vn-av ${l.c}">${AV[c.av](l.mood)}</div>` : ''}</div>
+    <div class="vn-box ${isNar ? 'nar' : ''}" id="vnBox" role="button" tabindex="0" aria-label="다음 대사">
+      ${!isNar ? `<div class="vn-name">${esc(c.name)}${c.tag ? `<small>${esc(c.tag)}</small>` : ''}</div>` : ''}
+      <p class="vn-text" id="vnText" data-full="${esc(lineText(l))}"></p>
+      ${l.src ? `<div class="vn-src">기록 근거: ${esc(l.src)}</div>` : (!isNar && l.c !== 'nuri' ? '<div class="vn-src">게임 진행을 위해 만든 대사예요.</div>' : '')}
+      <div class="vn-ctrl">
+        <span class="muted">${i + 1} / ${sc.lines.length}</span>
+        <div class="row">
+          <button class="btn ghost small" data-act="vnlog">대화 기록</button>
+          ${i > 0 ? '<button class="btn ghost small" data-act="vnprev">◀ 이전</button>' : ''}
+          ${!last ? '<button class="btn ghost small" data-act="vnskip">건너뛰기</button>' : ''}
+          <button class="btn ${last ? 'orange' : ''} small" data-act="vnnext">${last ? (S.done[id] ? '닫기' : '계속 →') : '다음 ▶'}</button>
+        </div>
+      </div>
+    </div>
+  </div></section>`;
+}
+let typer = null;
+function startTyping() {
+  const el = $('#vnText'); if (!el) return;
+  const full = el.dataset.full; clearInterval(typer);
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) { el.textContent = full; return; }
+  let n = 0; el.textContent = '';
+  typer = setInterval(() => { n += 2; el.textContent = full.slice(0, n); if (n >= full.length) { clearInterval(typer); typer = null; } }, 18);
+}
+function vnNext() {
+  const el = $('#vnText');
+  if (typer && el) { clearInterval(typer); typer = null; el.textContent = el.dataset.full; return; }
+  const id = S.screen, sc = SCENES[id];
+  if (S.line < sc.lines.length - 1) { S.line++; save(); render(); return; }
+  if (S.done[id]) { go('dash'); return; }
+  advance(id);
+}
+function vnLog() {
+  const id = S.screen, sc = SCENES[id];
+  modal(`<h2 class="mt">대화 기록</h2><div class="vnlog">${sc.lines.slice(0, S.line + 1).map(l => `<p><b>${esc(CHARS[l.c].name)}</b> ${esc(lineText(l))}${l.src ? `<br><span class="muted">기록 근거: ${esc(l.src)}</span>` : ''}</p>`).join('')}</div>`, [{ text: '닫기' }]);
+}
+
+/* ---------- chapter 1 game: three organs ---------- */
+function vOrgans() {
+  const O = S.organ, allMatched = ORGANS.every(o => O.matched[o.id]);
+  return `<section class="scene dash-scene">${sceneBg('ballotbox1948', 'small')}
+  <div class="wrap enter">
+    <div class="mhead"><div><span class="kicker">1장 · 반민특위의 탄생</span><h2>세 기관의 역할 맞추기</h2>
+      <p>왼쪽 기관을 누른 다음, 그 기관이 하는 일을 오른쪽에서 고르세요. 틀려도 괜찮아요!</p></div>
+      ${mascot(allMatched ? '모두 맞췄어요! 마지막으로 한 문제만 더!' : '조사 → 기소 → 재판, 순서를 떠올려 봐요.', 'happy', 70)}</div>
+    <div class="organs">
+      <div class="ocol">${ORGANS.map(o => `<button class="ocard ${O.sel === o.id ? 'sel' : ''} ${O.matched[o.id] ? 'ok' : ''}" data-organ="${o.id}" ${O.matched[o.id] ? 'disabled' : ''}>
+        <span class="oi">${o.icon}</span><b>${esc(o.name)}</b>${O.matched[o.id] ? `<small>✓ ${esc(ORGAN_ROLES.find(r => r.id === o.role).text)}</small>` : ''}</button>`).join('')}</div>
+      <div class="ocol">${ORGAN_ROLES.map(r => { const used = Object.values(O.matched).includes(r.id);
+        return `<button class="rcard ${used ? 'ok' : ''}" data-role="${r.id}" ${used ? 'disabled' : ''}>${esc(r.text)}<small>근거: ${esc(r.src)}</small></button>`; }).join('')}</div>
+    </div>
+    ${allMatched ? `<div class="paper pad quiz enter">
+      <h3>${esc(ORGAN_QUIZ.q)}</h3>
+      <div class="pen" style="margin-top:12px">${ORGAN_QUIZ.opts.map((q, i) => `<button class="chip ${O.quiz === i ? (q.ok ? 'right' : 'wrongc') : ''}" data-quiz="${i}">${esc(q.t)}</button>`).join('')}</div>
+      ${O.quiz !== null && O.quiz !== undefined ? `<div class="result ${ORGAN_QUIZ.opts[O.quiz].ok ? 'r-valid' : 'r-wrong'}"><p>${esc(ORGAN_QUIZ.opts[O.quiz].why)}</p></div>` : ''}
+      <p class="muted" style="margin-top:8px">근거: ${esc(ORGAN_QUIZ.src)}</p>
+      <div class="row" style="justify-content:flex-end;margin-top:10px"><button class="btn orange" data-act="organdone" ${O.quiz !== null && O.quiz !== undefined && ORGAN_QUIZ.opts[O.quiz].ok ? '' : 'disabled'}>다음 →</button></div>
+    </div>` : ''}
+  </div></section>`;
+}
+function pickOrgan(id) { S.organ.sel = id; save(); render(); }
+function pickRole(rid) {
+  const O = S.organ;
+  if (!O.sel) { toast('먼저 왼쪽에서 기관을 골라 주세요.'); return; }
+  const o = ORGANS.find(x => x.id === O.sel);
+  if (o.role === rid) { O.matched[o.id] = rid; O.sel = null; save(); toast('정답!'); render(); }
+  else { const b = $(`[data-role="${rid}"]`); if (b) { b.classList.remove('shake'); void b.offsetWidth; b.classList.add('shake'); } toast('다시 생각해 봐요. 이 기관이 맡은 단계는?'); }
+}
+
+/* ---------- chapter 4: trial ---------- */
+function vTrial() {
+  const T = S.trial, R = TRIAL[Math.min(T.round, TRIAL.length - 1)], c = CHARS[R.who];
+  return `<section class="scene court-scene">${sceneBg('courthouse')}
+  <div class="wrap enter">
+    <div class="mhead"><div><span class="kicker">4장 · 특별재판부</span><h2>공판: 반박과 재반박</h2>
+      <p>피고 측 주장을 듣고, <b style="color:var(--gold)">증거에 근거한 재반박</b>을 고르세요.</p></div>
+      <div class="trialbar"><div class="tb-round">반박 <b>${Math.min(T.round + 1, TRIAL.length)}</b>/${TRIAL.length}</div>
+        <div class="tb-hp" title="설득력">설득력 ${Array.from({ length: TRIAL_HP }, (_, i) => `<span class="${i < T.hp ? 'on' : ''}">⚖</span>`).join('')}</div></div>
+    </div>
+    <div class="bench">
+      <div class="seat def ${!T.solved && R.who === 'lawyer' ? 'talk' : ''}"><div class="vn-av">${AV.lawyer()}</div><span>변호인</span></div>
+      <div class="seat def ${!T.solved && R.who === 'park' ? 'talk' : ''}"><div class="vn-av">${AV.park()}</div><span>피고인 박흥식</span></div>
+      <div class="seat judge ${T.solved && R.opts.find(o => o.ok).react.c === 'judge' ? 'talk' : ''}"><div class="vn-av">${AV.judge()}</div><span>재판장</span></div>
+      <div class="seat pros ${T.solved ? 'talk' : ''}"><div class="vn-av">${AV.me()}</div><span>특별검찰관 (나)</span></div>
+    </div>
+    <div class="claim ${T.solved ? 'dim' : ''}">
+      <div class="vn-name">${esc(c.name)}<small>${R.who === 'park' ? '피고인 · 실존 인물' : '피고 측'}</small></div>
+      <p>“${esc(R.claim)}”</p>
+      <div class="vn-src">기록 근거: ${esc(R.src)}</div>
+    </div>
+    ${T.solved ? `<div class="objection enter"><div class="obj-stamp">반박 성공!</div>
+        <div class="react"><div class="vn-av sm">${AV[CHARS[R.opts.find(o => o.ok).react.c].av]()}</div><div><b>${esc(CHARS[R.opts.find(o => o.ok).react.c].name)}</b><p>${esc(R.opts.find(o => o.ok).react.t)}</p></div></div>
+        <div class="row" style="justify-content:flex-end"><button class="btn orange" data-act="trialnext">${T.round >= TRIAL.length - 1 ? '구형 의견으로 →' : '다음 반박 듣기 →'}</button></div></div>`
+      : `<h3 class="sect-title" style="margin-top:22px">이의 있습니다! 어떻게 반박할까?</h3>
+      <div class="rebuts">${[[1, 0, 2], [2, 1, 0], [0, 2, 1], [1, 2, 0], [2, 0, 1]][T.round % 5].map(i => [R.opts[i], i]).map(([o, i]) => { const w = T.wrong.includes(i);
+        return `<button class="rebut ${w ? 'wrong' : ''}" data-rebut="${i}" ${w ? 'disabled' : ''}>
+          <p>${esc(o.t)}</p>
+          ${o.ev.length ? `<div class="evchips">${o.ev.map(e => `<span class="evchip"><span class="th">${miniVisual(e)}</span>${esc(ev(e).title)}</span>`).join('')}</div>` : '<div class="evchips"><span class="evchip none">제시할 증거 없음</span></div>'}
+          ${w ? `<div class="why">✗ ${esc(o.why)}</div>` : ''}
+        </button>`; }).join('')}</div>`}
+  </div></section>`;
+}
+function pickRebut(i) {
+  const T = S.trial, R = TRIAL[T.round], o = R.opts[i];
+  if (o.ok) { T.solved = true; save(); flash(); render(); return; }
+  T.wrong.push(i); T.hp -= 1; save();
+  if (T.hp > 0) { render(); const b = $(`[data-rebut="${i}"]`); if (b) b.classList.add('shake'); return; }
+  const issues = [{ text: `반박 ${T.round + 1}: “${R.claim.slice(0, 30)}…”에 근거 없는 재반박을 거듭했어요. ${o.why}` }];
+  spend('trial', issues);
+  S.trial = { round: 0, hp: TRIAL_HP, wrong: [], solved: false }; save();
+  if (S.failed) { render(); return; }
+  failModal('bad', '재판부가 공판을 연기했어요', [{ text: '설득력을 모두 잃었어요. 첫 번째 반박부터 다시 시작해요.' }, ...issues],
+    [{ text: '조사 기록 다시 보기', cls: 'ghost', fn: () => go('m1') }, { text: '공판 다시 시작', cls: 'orange', fn: render }]);
+}
+function trialNext() {
+  const T = S.trial;
+  if (T.round >= TRIAL.length - 1) { advance('trial'); return; }
+  T.round += 1; T.solved = false; T.wrong = []; save(); render();
+}
+
 /* ---------- events ---------- */
 function bind() {
   $$('[data-go]', app).forEach(b => b.addEventListener('click', () => go(b.dataset.go)));
   $$('[data-open]', app).forEach(b => b.addEventListener('click', () => openViewer(b.dataset.open)));
   $$('[data-cat]', app).forEach(b => b.addEventListener('click', () => { S.cat = b.dataset.cat; save(); render(); }));
-  $$('[data-remove]', app).forEach(b => b.addEventListener('click', () => { if (S.done[1]) return; S.locker = S.locker.filter(x => x !== b.dataset.remove); save(); render(); }));
+  $$('[data-remove]', app).forEach(b => b.addEventListener('click', () => { if (S.done.m1) return; S.locker = S.locker.filter(x => x !== b.dataset.remove); save(); render(); }));
   $$('[data-view]', app).forEach(b => b.addEventListener('click', e => { e.stopPropagation(); openViewer(b.dataset.view); }));
   $$('[data-law]', app).forEach(b => b.addEventListener('click', e => { e.stopPropagation(); showLaw(b.dataset.law); }));
   $$('[data-pick]', app).forEach(b => {
@@ -849,6 +1047,15 @@ function bind() {
     $$('input[name=type]', app).forEach(r => r.addEventListener('change', () => { $('#yearsStep').classList.toggle('hidden', !(r.value === 'prison' || r.value === 'civil')); readM4(); }));
     $$('input[name=conf],input[name=sreason],input[name=years]', app).forEach(r => r.addEventListener('change', readM4));
     $$('[data-step]', app).forEach(b => b.addEventListener('click', () => { const i = $('input[name=years]', app); i.value = Math.max(1, (parseInt(i.value, 10) || 1) + +b.dataset.step); readM4(); }));
+  }
+  $$('[data-organ]', app).forEach(b => b.addEventListener('click', () => pickOrgan(b.dataset.organ)));
+  $$('[data-role]', app).forEach(b => b.addEventListener('click', () => pickRole(b.dataset.role)));
+  $$('[data-quiz]', app).forEach(b => b.addEventListener('click', () => { S.organ.quiz = +b.dataset.quiz; save(); render(); }));
+  $$('[data-rebut]', app).forEach(b => b.addEventListener('click', () => pickRebut(+b.dataset.rebut)));
+  const vb = $('#vnBox');
+  if (vb) {
+    vb.addEventListener('click', e => { if (!e.target.closest('button')) vnNext(); });
+    vb.addEventListener('keydown', e => { if ((e.key === 'Enter' || e.key === ' ') && !e.target.closest('button')) { e.preventDefault(); vnNext(); } });
   }
   const ta = $('#reflect');
   if (ta) ta.addEventListener('input', () => { S.reflection = ta.value; $('#rcount').textContent = ta.value.trim().length + '자'; save(); });
@@ -867,10 +1074,16 @@ function bind() {
     else if (a === 'm5submit') submitM5();
     else if (a === 'records') showRecords();
     else if (a === 'copy') copyResult();
+    else if (a === 'vnnext') vnNext();
+    else if (a === 'vnprev') { clearInterval(typer); typer = null; S.line = Math.max(0, S.line - 1); save(); render(); }
+    else if (a === 'vnskip') { clearInterval(typer); typer = null; S.line = SCENES[S.screen].lines.length - 1; save(); render(); }
+    else if (a === 'vnlog') vnLog();
+    else if (a === 'organdone') advance('c1g');
+    else if (a === 'trialnext') trialNext();
   }));
 }
 function startGame() {
-  const cf = $('#casefile'); const target = (S.done[1] || S.viewed.length) ? 'dash' : 'm1';
+  const cf = $('#casefile'); const target = (S.reached > 0 || S.line > 0) ? 'dash' : 'c1a';
   if (cf && getComputedStyle(cf.parentElement).display !== 'none' && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
     cf.classList.add('open'); setTimeout(() => go(target), 650);
   } else go(target);
@@ -892,6 +1105,6 @@ function confirmReset() {
 $('#btnSources').addEventListener('click', showRecords);
 $('#btnReset').addEventListener('click', confirmReset);
 
-if (S.screen === 'end' && !S.done[5]) S.screen = 'dash';
+if (S.screen === 'end' && !S.done.m5) S.screen = 'dash';
 render();
 })();
