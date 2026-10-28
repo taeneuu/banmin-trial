@@ -5,6 +5,8 @@
 'use strict';
 
 const KEY = 'banmin-trial-v2';
+/* 선생님 제출용 Apps Script 웹 앱 주소 (광복 1945와 같은 스프레드시트, '반민특위 재판정' 시트에 저장). 바꾸려면 이 줄만 고치면 된다. */
+const SUBMIT_URL = 'https://script.google.com/macros/s/AKfycbyh_7Yly5B_uegiPNIdX8DtRPn2vvc4tA7PGyN4wqyhrB1G2-dQVJOlpbMNA_mX6s9d/exec';
 const MAX_CHANCES = 4;
 const LOCKER_MAX = 6;
 const MISSIONS = [
@@ -36,7 +38,7 @@ const fresh = () => ({
   chances: MAX_CHANCES, mistakes: [],
   ind: { main: '', extra: [], ev: [], reason: '' },
   sent: { type: '', years: '', conf: '', reason: '' },
-  reflection: '', failed: false,
+  reflection: '', failed: false, name: '', submittedAt: '',
 });
 let S = load();
 function load() {
@@ -774,18 +776,56 @@ function vM5() {
     <div class="paper reflect tape">
       <p class="q">친일 행위를 입증할 증거와 처벌할 법이 있었는데도, 친일 청산은 왜 충분히 이루어지지 못했을까?</p>
       <textarea id="reflect" placeholder="위 연표에서 찾은 근거를 들어 2~3문장으로 써 보세요. (20자 이상)">${esc(S.reflection)}</textarea>
+      <div class="row" style="justify-content:flex-end;margin-top:6px"><span class="muted" id="rcount">${S.reflection.trim().length}자</span></div>
+      <div class="submitbox">
+        <label for="stuName"><b>📮 선생님께 제출하기</b><span class="muted">학번과 이름을 쓰면 답이 선생님의 기록지에 저장돼요.</span></label>
+        <div class="subrow"><input id="stuName" maxlength="20" autocomplete="off" placeholder="학번 이름 (예: 10305 김하늘)" value="${esc(S.name || '')}"></div>
+        <div class="submsg" id="submsg"></div>
+      </div>
       <div class="row" style="justify-content:space-between;margin-top:12px">
-        <span class="muted" id="rcount">${S.reflection.trim().length}자</span>
-        <div class="row"><button class="btn ghost" data-act="records">역사 기록 열람</button><button class="btn orange" data-act="m5submit">답변 제출하고 사건 종결</button></div>
+        <button class="btn ghost" data-act="records">역사 기록 열람</button>
+        <button class="btn orange" data-act="m5submit" id="m5btn">${S.submittedAt ? '사건 종결 화면으로 →' : '답변 제출하고 사건 종결'}</button>
       </div>
     </div>
   </div></section>`;
 }
+function finishCase() { S.done.m5 = true; S.reached = FLOW.length - 1; save(); go('end'); }
+function submitData() {
+  const I = S.ind;
+  return {
+    app: 'banmin', name: S.name,
+    laws: [I.main, ...I.extra].filter(Boolean).map(id => LAWS[id].short + ' ' + LAWS[id].name).join(', '),
+    evidence: I.ev.map(id => ev(id).title).join(', '),
+    reason: (REASONS.find(r => r.id === I.reason) || {}).text || '',
+    sentence: sentenceText(),
+    issue: S.found.ISSUE ? '예' : '아니오',
+    chances: `${MAX_CHANCES - S.chances}번`,
+    reflection: S.reflection,
+    all: summaryText(),
+  };
+}
+function sendSubmission(onOk, onFail) {
+  const ctl = window.AbortController ? new AbortController() : null;
+  const to = setTimeout(() => ctl && ctl.abort(), 15000);
+  fetch(SUBMIT_URL, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(submitData()), signal: ctl ? ctl.signal : undefined })
+    .then(() => { clearTimeout(to); const d = new Date(); S.submittedAt = `${d.getMonth() + 1}월 ${d.getDate()}일 ${d.getHours()}시 ${String(d.getMinutes()).padStart(2, '0')}분`; save(); onOk(); })
+    .catch(() => { clearTimeout(to); onFail(); });
+}
 function submitM5() {
+  if (S.submittedAt) { finishCase(); return; }
   const t = ($('#reflect').value || '').trim();
-  S.reflection = t; save();
+  const nm = ($('#stuName').value || '').trim();
+  S.reflection = t; S.name = nm; save();
+  const msg = $('#submsg'), btn = $('#m5btn');
   if (t.length < 20) { toast('20자 이상 써야 제출할 수 있어요.'); $('#reflect').classList.add('shake'); return; }
-  S.done.m5 = true; S.reached = FLOW.length - 1; save(); go('end');
+  if (nm.length < 2 || !/\d/.test(nm)) { msg.className = 'submsg no'; msg.textContent = '학번과 이름을 함께 써 주세요. (예: 10305 김하늘)'; $('#stuName').focus(); $('#stuName').classList.add('shake'); return; }
+  btn.disabled = true; btn.textContent = '보내는 중…'; msg.className = 'submsg'; msg.textContent = '잠시만 기다려 주세요.';
+  sendSubmission(() => { toast('선생님께 제출했어요!'); finishCase(); }, () => {
+    btn.disabled = false; btn.textContent = '다시 제출하기';
+    msg.className = 'submsg no';
+    msg.innerHTML = '제출하지 못했어요. 인터넷 연결을 확인하고 다시 눌러 주세요. <button class="linkbtn" data-act="skipsubmit" style="color:var(--red2)">제출하지 않고 사건 종결하기</button>';
+    $('[data-act=skipsubmit]', msg).addEventListener('click', finishCase);
+  });
 }
 function summaryText() {
   const I = S.ind;
@@ -793,6 +833,7 @@ function summaryText() {
     `적용 조항: ${[I.main, ...I.extra].filter(Boolean).map(id => LAWS[id].short + ' ' + LAWS[id].name).join(', ')}`,
     `증거: ${I.ev.map(id => ev(id).title).join(', ')}`,
     `구형: ${sentenceText()}`,
+    `학번 이름: ${S.name || '(미입력)'}`,
     `쟁점 발견: ${S.found.ISSUE ? '예' : '아니오'} / 사용한 보완 조사: ${MAX_CHANCES - S.chances}번`,
     `성찰: ${S.reflection}`].join('\n');
 }
@@ -806,6 +847,9 @@ function vEnd() {
       ${mascot('수고하셨어요, 검찰관님! 이 사건의 기록은 여기까지예요.', 'wow', 96, true, true)}
       <div class="celebrate"><div class="bigstamp" style="border-color:var(--red);color:var(--red)">수사 종결</div></div>
       <p class="sub">당신은 교육용 시나리오 안에서 기소 논리를 완성했어요. 실제 역사에서 박흥식은 <b>무죄</b> 판결을 받았어요.</p>
+      <div class="substatus ${S.submittedAt ? 'ok' : 'no'}">${S.submittedAt
+        ? `✅ ${esc(S.name)} · ${esc(S.submittedAt)}에 선생님께 제출했어요.`
+        : `아직 선생님께 제출하지 않았어요. <button class="btn small orange" data-act="resubmit">지금 제출하기</button>`}</div>
     </div>
     <div class="paper indict" style="margin-top:24px">
       <div class="head"><h2>起訴狀</h2><table><tr><td>피고인</td><td>박흥식</td></tr><tr><td>작성</td><td>특별검찰관(당신)</td></tr></table></div>
@@ -1167,6 +1211,8 @@ function bind() {
     vb.addEventListener('click', e => { if (!e.target.closest('button')) vnNext(); });
     vb.addEventListener('keydown', e => { if ((e.key === 'Enter' || e.key === ' ') && !e.target.closest('button')) { e.preventDefault(); vnNext(); } });
   }
+  const sn = $('#stuName');
+  if (sn) { sn.addEventListener('input', () => { S.name = sn.value.trim(); save(); }); sn.addEventListener('keydown', e => { if (e.key === 'Enter') submitM5(); }); }
   const ta = $('#reflect');
   if (ta) ta.addEventListener('input', () => { S.reflection = ta.value; $('#rcount').textContent = ta.value.trim().length + '자'; save(); });
 
@@ -1184,6 +1230,11 @@ function bind() {
     else if (a === 'm5submit') submitM5();
     else if (a === 'records') showRecords();
     else if (a === 'copy') copyResult();
+    else if (a === 'resubmit') {
+      if (!S.name || S.name.length < 2) { go('m5'); toast('학번과 이름을 입력하고 제출해 주세요.'); return; }
+      b.disabled = true; b.textContent = '보내는 중…';
+      sendSubmission(() => { toast('선생님께 제출했어요!'); render(); }, () => { b.disabled = false; b.textContent = '다시 시도'; toast('제출하지 못했어요. 인터넷 연결을 확인해 주세요.'); });
+    }
     else if (a === 'vnnext') vnNext();
     else if (a === 'vnprev') { clearInterval(typer); typer = null; S.line = Math.max(0, S.line - 1); save(); render(); }
     else if (a === 'vnskip') { clearInterval(typer); typer = null; S.line = SCENES[S.screen].lines.length - 1; save(); render(); }

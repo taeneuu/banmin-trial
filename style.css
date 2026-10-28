@@ -637,3 +637,15 @@ textarea{width:100%;min-height:130px;font:16px/1.7 var(--sans);padding:14px;bord
   .photo-credit{position:relative;order:2;right:auto;bottom:auto;align-self:center;margin:0 12px 12px;text-align:center}
 }
 .big-stamp:not(.in){visibility:hidden}
+
+/* ===== v5: submission ===== */
+.submitbox{margin-top:16px;background:#fff7e6;border:2px dashed #e3c98d;border-radius:12px;padding:14px 16px}
+.submitbox label{display:flex;flex-direction:column;gap:2px;margin-bottom:8px}
+.submitbox label b{font-size:16px;color:var(--navy)}
+.subrow input{width:100%;font:700 17px var(--sans);padding:12px 14px;border:2px solid var(--line);border-radius:10px;background:#fff}
+.subrow input:focus{border-color:var(--orange);outline:none}
+.submsg{margin-top:8px;font-size:14px;min-height:1.2em;color:var(--ink2)}
+.submsg.no{color:var(--red2);font-weight:700}
+.substatus{margin:14px auto 0;max-width:560px;border-radius:12px;padding:10px 14px;font-weight:700;font-size:15px;display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap}
+.substatus.ok{background:#e1f2ee;color:var(--teal)}
+.substatus.no{background:#fff1e4;color:var(--orange2)}
