@@ -89,7 +89,7 @@ const ILLU = {
   family: '<svg viewBox="0 0 100 80"><rect x="26" y="6" width="48" height="66" rx="4" fill="#efe1bf" stroke="#6b5530" stroke-width="4"/><circle cx="50" cy="32" r="11" fill="#9a8460"/><path d="M32 66c2-14 10-20 18-20s16 6 18 20" fill="#9a8460"/></svg>',
 };
 function illu(type) {
-  return `<div class="illu">${ILLU[type] || ILLU.official}<span class="lbl tag illu">일러스트</span></div>`;
+  return `<div class="illu">${ILLU[type] || ILLU.official}<span class="lbl tag illut">일러스트</span></div>`;
 }
 function visual(id, size = 'small') {
   const v = EVIDENCE_VISUAL[id] || { illu: 'official' };
@@ -293,7 +293,7 @@ function vM1() {
     <div class="mhead">
       <div><span class="kicker">MISSION 1</span><h2>사건 파일: 수사 개시</h2>
         <p>자료 카드를 눌러 자세히 읽고, 혐의를 입증할 자료만 <b style="color:var(--gold)">증거로 채택</b>하세요.</p></div>
-      ${mascot(first ? '<span class="tag illu">교육용 재구성</span><br>1949년 1월, 화신 사장 박흥식이 체포됐어요. 이 사건은 검찰관님 담당이에요!'
+      ${mascot(first ? '<span class="tag illut">교육용 재구성</span><br>1949년 1월, 화신 사장 박흥식이 체포됐어요. 이 사건은 검찰관님 담당이에요!'
         : (S.done[1] ? '추가 자료 3건이 도착했어요. MISSION 2에서 함께 써요.' : '관련 없는 자료를 넣으면 보고서가 반려돼요. 신중하게!'), 'happy', 70)}
     </div>
     <div class="tabs">${CATS.filter(c => counts[c.id]).map(c => `<button class="${S.cat === c.id ? 'on' : ''}" data-cat="${c.id}">${c.name}<span>${counts[c.id]}</span></button>`).join('')}</div>
@@ -329,7 +329,7 @@ function openViewer(id) {
   const e = ev(id), v = EVIDENCE_VISUAL[id], inL = S.locker.includes(id);
   const im = v.img ? IMAGES[v.img] : null;
   const cap = im ? `<div class="vcap"><span class="tag ${im.kind === 'source' ? 'src' : 'refimg'}">${im.kind === 'source' ? '사료 사진' : '참고 이미지'}</span> ${esc(im.title)} (${esc(im.date)})<br>${im.note ? esc(im.note) + '<br>' : ''}<span style="opacity:.75">${esc(im.credit)}</span></div>`
-    : '<div class="vcap"><span class="tag illu">일러스트</span> 자료 유형을 나타낸 그림이에요. 실제 자료 사진이 아니에요.</div>';
+    : '<div class="vcap"><span class="tag illut">일러스트</span> 자료 유형을 나타낸 그림이에요. 실제 자료 사진이 아니에요.</div>';
   const canAdd = !S.done[1] && S.screen === 'm1';
   const btns = [];
   if (canAdd) btns.push(inL ? { text: '보관함에서 빼기', cls: 'ghost', fn: () => { S.locker = S.locker.filter(x => x !== id); save(); render(); } }
@@ -611,7 +611,7 @@ function vM4() {
     <div class="mhead"><div><span class="kicker">MISSION 4</span><h2>구형 의견: 어떤 형벌을 제안할까?</h2>
       <p>검찰관이 재판부에 요청하는 형벌이 <b style="color:var(--gold)">구형</b>이에요. 최종 판결은 재판부가 따로 내려요.</p></div></div>
     <div class="court-top">
-      <div class="speech"><div class="who">재판장 <span class="tag illu">교육용 재구성</span></div>
+      <div class="speech"><div class="who">재판장 <span class="tag illut">교육용 재구성</span></div>
         피고인 박흥식에 대한 공판을 계속합니다. 특별검찰관은 확인된 혐의에 따라 구형 의견을 진술하십시오.</div>
       <figure class="court-photo" style="margin:0">${img('trial1949', 'small', '1949년 반민특위 재판 광경')}<figcaption>사료 사진: 1949년 반민특위 재판 광경 · 퍼블릭 도메인</figcaption></figure>
     </div>
