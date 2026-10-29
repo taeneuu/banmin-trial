@@ -968,7 +968,6 @@ function vScene(id) {
       <div class="vn-ctrl">
         <span class="muted">${i + 1} / ${sc.lines.length}</span>
         <div class="row">
-          <button class="btn ghost small" data-act="vnlog">대화 기록</button>
           ${i > 0 ? '<button class="btn ghost small" data-act="vnprev">◀ 이전</button>' : ''}
           ${!last ? '<button class="btn ghost small" data-act="vnskip">건너뛰기</button>' : ''}
           <button class="btn ${last ? 'orange' : ''} small" data-act="vnnext">${last ? (S.done[id] ? '닫기' : '계속 →') : '다음 ▶'}</button>
@@ -992,10 +991,6 @@ function vnNext() {
   if (S.line < sc.lines.length - 1) { S.line++; save(); render(); return; }
   if (S.done[id]) { go('dash'); return; }
   advance(id);
-}
-function vnLog() {
-  const id = S.screen, sc = SCENES[id];
-  modal(`<h2 class="mt">대화 기록</h2><div class="vnlog">${sc.lines.slice(0, S.line + 1).map(l => `<p><b>${esc(CHARS[l.c].name)}</b> ${esc(lineText(l))}${l.src ? `<br><span class="muted">기록 근거: ${esc(l.src)}</span>` : ''}</p>`).join('')}</div>`, [{ text: '닫기' }]);
 }
 
 /* ---------- chapter 1 game: three organs ---------- */
@@ -1189,12 +1184,11 @@ function trialNext() {
 
 
 /* ---------- chapter 2: chase (tap mini-game) ---------- */
-const CHASE = { tap: 4, decay: 4, time: 5, easyTime: 7.5 };
+const CHASE = { tap: 4, decay: 4, time: 3.5 };
 let CH = null;
-function chaseTime() { return S.chaseFails >= 2 ? CHASE.easyTime : CHASE.time; }
+function chaseTime() { return CHASE.time; }
 function stopChase() { if (CH && CH.timer) { clearInterval(CH.timer); CH.timer = null; } }
 function vChase() {
-  const easy = S.chaseFails >= 2;
   return `<section class="scene chase-scene">${sceneBg('hwashin')}
   <div class="wrap enter">
     <div class="mhead"><div><span class="kicker">2장 · 특별조사위원회</span><h2>사장실 추격!</h2>
@@ -1203,7 +1197,7 @@ function vChase() {
     <div class="chase" id="chase">
       <div class="ch-hud">
         <div class="ch-call"><span>☎ 전화 연결까지</span><div class="ch-bar"><div id="chCall"></div></div><b id="chSec">${chaseTime().toFixed(1)}초</b></div>
-        <div class="ch-tries">${S.chaseFails ? `실패 ${S.chaseFails}번` : '첫 도전'}${easy ? ' · <b>여유 시간 +2.5초</b>' : ''}</div>
+        <div class="ch-tries">${S.chaseFails ? `실패 ${S.chaseFails}번` : '첫 도전'}</div>
       </div>
       <div class="ch-track">
         <div class="ch-floor"></div>
@@ -1292,7 +1286,6 @@ function chaseEnd(win) {
     ov.className = 'ch-over fail';
     ov.innerHTML = `<div class="ch-res"><div class="obj-stamp fail">놓쳤다!</div>
       <p>전화가 연결되고 말았어요. 처음부터 다시 쫓아가요!</p>
-      ${S.chaseFails >= 2 ? '<p class="easy">이번에는 시간을 2.5초 더 줄게요.</p>' : ''}
       <button class="btn orange" id="chRetry">다시 도전</button></div>`;
     $('#chRetry').addEventListener('click', () => render());
     $('#chRetry').focus();
@@ -1359,7 +1352,6 @@ function bind() {
     else if (a === 'vnnext') vnNext();
     else if (a === 'vnprev') { clearInterval(typer); typer = null; S.line = Math.max(0, S.line - 1); save(); render(); }
     else if (a === 'vnskip') { clearInterval(typer); typer = null; S.line = SCENES[S.screen].lines.length - 1; save(); render(); }
-    else if (a === 'vnlog') vnLog();
     else if (a === 'organdone') advance('c1g');
     else if (a === 'trialnext') trialNext();
     else if (a === 'present') presentEvidence();
