@@ -38,11 +38,19 @@ const fresh = () => ({
   chances: MAX_CHANCES, mistakes: [],
   ind: { main: '', extra: [], ev: [], reason: '' },
   sent: { type: '', years: '', conf: '', reason: '' },
-  reflection: '', failed: false, name: '', submittedAt: '',
+  reflection: '', failed: false, name: '', submittedAt: '', flowVer: 2, chaseFails: 0,
 });
 let S = load();
 function load() {
-  try { const raw = localStorage.getItem(KEY); if (raw) return Object.assign(fresh(), JSON.parse(raw)); } catch (e) {}
+  try {
+    const raw = localStorage.getItem(KEY);
+    if (raw) {
+      const old = JSON.parse(raw);
+      const st = Object.assign(fresh(), old);
+      if (!old.flowVer) { if (st.reached >= 4) st.reached += 2; st.flowVer = 2; try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (e) {} }
+      return st;
+    }
+  } catch (e) {}
   return fresh();
 }
 function save() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} }
@@ -200,7 +208,7 @@ function render() {
   renderHud();
   const scr = S.failed ? 'fail' : S.screen;
   const st = stepOf(scr);
-  const v = st ? ({ scene: () => vScene(scr), organs: vOrgans, trial: vTrial, m1: vM1, m2: vM2, m3: vM3, m4: vM4, m5: vM5 })[st.type]
+  const v = st ? ({ scene: () => vScene(scr), chase: vChase, organs: vOrgans, trial: vTrial, m1: vM1, m2: vM2, m3: vM3, m4: vM4, m5: vM5 })[st.type]
     : ({ title: vTitle, dash: vDash, end: vEnd, fail: vFail }[scr] || vDash);
   app.innerHTML = v();
   if (!animateNext) $$('.enter', app).forEach(el => el.classList.remove('enter'));
@@ -210,6 +218,7 @@ function render() {
   if (scr === 'm2') requestAnimationFrame(drawStrings);
   if (st && st.type === 'scene') startTyping();
   if (scr === 'trial') startRoundTimers();
+  if (scr === 'chase') bindChase();
 }
 
 /* ---------- TITLE ---------- */
@@ -306,6 +315,7 @@ function dashHint() {
   return ({
     scene: '대화를 따라가며 이야기를 확인해요. 말풍선을 누르면 다음 대사로 넘어가요.',
     organs: '세 기관이 각각 무슨 일을 했는지 짝을 맞춰 봐요.',
+    chase: '화면을 빠르게 연타해서 박흥식을 쫓아요! 늦으면 처음부터 다시예요.',
     m1: '자료를 하나씩 읽어 봐요. 혐의와 <b>관계없는 자료</b>도 섞여 있어요!',
     m2: '수사 보드에서 두 장씩 <b>연결</b>해 혐의를 세워요.',
     m3: '<b>조문의 문구</b>와 피의자의 행위가 딱 맞는지 확인해요.',
@@ -1025,7 +1035,7 @@ function pickRole(rid) {
 
 /* ---------- chapter 4: trial ---------- */
 let roundTimer = null, tIdx = 0, timeLeft = null, timerRound = -1;
-function stopRoundTimers() { clearInterval(roundTimer); roundTimer = null; }
+function stopRoundTimers() { clearInterval(roundTimer); roundTimer = null; stopChase(); }
 const ORDERS = [[1, 0, 2], [2, 1, 0], [0, 2, 1], [1, 2, 0], [2, 0, 1]];
 function solvedLine(R) { return R.line || R.opts.find(o => o.ok).t; }
 function solvedReact(R) { return R.react || R.opts.find(o => o.ok).react; }
@@ -1177,6 +1187,117 @@ function trialNext() {
   T.round += 1; T.solved = false; T.wrong = []; T.picked = null; T.sorted = {}; T.lastWhy = null; save(); render();
 }
 
+
+/* ---------- chapter 2: chase (tap mini-game) ---------- */
+const CHASE = { tap: 4, decay: 4, time: 7.5, easyTime: 10 };
+let CH = null;
+function chaseTime() { return S.chaseFails >= 2 ? CHASE.easyTime : CHASE.time; }
+function stopChase() { if (CH && CH.timer) { clearInterval(CH.timer); CH.timer = null; } }
+function vChase() {
+  const easy = S.chaseFails >= 2;
+  return `<section class="scene chase-scene">${sceneBg('hwashin')}
+  <div class="wrap enter">
+    <div class="mhead"><div><span class="kicker">2장 · 특별조사위원회</span><h2>사장실 추격!</h2>
+      <p>박흥식이 비밀문으로 빠져나가 어딘가에 연락하려 해요. <b style="color:var(--gold)">화면을 빠르게 연타</b>해서 전화가 연결되기 전에 따라잡으세요!</p></div>
+      <span class="tag illut">교육용 재구성 · 미니게임</span></div>
+    <div class="chase" id="chase">
+      <div class="ch-hud">
+        <div class="ch-call"><span>☎ 전화 연결까지</span><div class="ch-bar"><div id="chCall"></div></div><b id="chSec">${chaseTime().toFixed(1)}초</b></div>
+        <div class="ch-tries">${S.chaseFails ? `실패 ${S.chaseFails}번` : '첫 도전'}${easy ? ' · <b>여유 시간 +2.5초</b>' : ''}</div>
+      </div>
+      <div class="ch-track">
+        <div class="ch-floor"></div>
+        <div class="ch-door" aria-hidden="true"><div class="ch-park">${AV.park()}</div><div class="ch-phone" id="chPhone">☎</div><small>비밀문 너머</small></div>
+        <div class="ch-runner" id="chRunner" aria-hidden="true">${AV.inv()}<div class="ch-dust"></div></div>
+        <div class="ch-pct" id="chPct">0%</div>
+      </div>
+      <div class="ch-over" id="chOver"></div>
+      <button class="ch-tap" id="chTap" type="button" aria-label="달리기 (연타)">
+        <span class="big">🏃 다다다닥!</span><span class="sm" id="chTapSm">눌러서 시작</span>
+      </button>
+      <p class="muted ch-help">컴퓨터에서는 스페이스바를 연타해도 돼요. 실패해도 보완 조사 기회는 줄지 않아요.</p>
+    </div>
+  </div></section>`;
+}
+function bindChase() {
+  stopChase();
+  CH = { phase: 'ready', pos: 0, left: chaseTime(), timer: null, last: 0, taps: 0 };
+  const tapBtn = $('#chTap'); if (!tapBtn) return;
+  const onTap = e => { if (e) e.preventDefault(); chaseTap(); };
+  tapBtn.addEventListener('pointerdown', onTap);
+  tapBtn.addEventListener('keydown', e => { if ((e.key === ' ' || e.key === 'Enter') && !e.repeat) onTap(e); else if (e.key === ' ' || e.key === 'Enter') e.preventDefault(); });
+  tapBtn.focus({ preventScroll: true });
+  paintChase();
+}
+document.addEventListener('keydown', e => {
+  if (S.screen !== 'chase' || e.key !== ' ' || e.repeat || !$('#modal').hidden) return;
+  if (document.activeElement && document.activeElement.id === 'chTap') return;
+  e.preventDefault(); chaseTap();
+});
+function chaseTap() {
+  if (!CH) return;
+  if (CH.phase === 'ready') { startChaseCount(); return; }
+  if (CH.phase !== 'run') return;
+  CH.pos = Math.min(100, CH.pos + CHASE.tap); CH.taps++;
+  const r = $('#chRunner'); if (r) { r.classList.remove('step'); void r.offsetWidth; r.classList.add('step'); }
+  if (CH.pos >= 100) chaseEnd(true); else paintChase();
+}
+function startChaseCount() {
+  CH.phase = 'count';
+  const ov = $('#chOver'), sm = $('#chTapSm');
+  let n = 3;
+  const show = () => { ov.className = 'ch-over count'; ov.innerHTML = `<b>${n}</b>`; if (sm) sm.textContent = '준비…'; };
+  show();
+  CH.timer = setInterval(() => {
+    n--;
+    if (n > 0) { show(); return; }
+    clearInterval(CH.timer); CH.timer = null;
+    ov.className = 'ch-over go'; ov.innerHTML = '<b>달려라!</b>';
+    setTimeout(() => { if (ov.classList.contains('go')) { ov.className = 'ch-over'; ov.innerHTML = ''; } }, 600);
+    if (sm) sm.textContent = '계속 연타!';
+    CH.phase = 'run'; CH.last = performance.now();
+    CH.timer = setInterval(chaseTick, 50);
+  }, 650);
+}
+function chaseTick() {
+  if (!$('#modal').hidden) { CH.last = performance.now(); return; }
+  const now = performance.now(), dt = (now - CH.last) / 1000; CH.last = now;
+  CH.left -= dt; CH.pos = Math.max(0, CH.pos - CHASE.decay * dt);
+  if (CH.left <= 0) { CH.left = 0; chaseEnd(false); return; }
+  paintChase();
+}
+function paintChase() {
+  const total = chaseTime();
+  const r = $('#chRunner'), c = $('#chCall'), sec = $('#chSec'), pct = $('#chPct'), ph = $('#chPhone');
+  if (r) r.style.left = `calc(${CH.pos} * (100% - ${innerWidth <= 640 ? 186 : 266}px) / 100 + 8px)`;
+  if (c) { c.style.width = (100 - CH.left / total * 100) + '%'; c.classList.toggle('low', CH.left < 2.5); }
+  if (sec) sec.textContent = CH.left.toFixed(1) + '초';
+  if (pct) pct.textContent = Math.round(CH.pos) + '%';
+  if (ph) ph.classList.toggle('ring', CH.phase === 'run' && CH.left < 3);
+}
+function chaseEnd(win) {
+  stopChase(); CH.phase = win ? 'win' : 'fail'; paintChase();
+  const ov = $('#chOver'), tap = $('#chTap');
+  if (tap) tap.disabled = true;
+  if (win) {
+    flash();
+    ov.className = 'ch-over win';
+    ov.innerHTML = `<div class="ch-res"><div class="obj-stamp">따라잡았다!</div>
+      <p>연타 ${CH.taps}번으로 박흥식을 따라잡았어요.</p>
+      <button class="btn orange" id="chNext">계속 →</button></div>`;
+    $('#chNext').addEventListener('click', () => { S.chaseFails = 0; save(); advance('chase'); });
+    $('#chNext').focus();
+  } else {
+    S.chaseFails = (S.chaseFails || 0) + 1; save();
+    ov.className = 'ch-over fail';
+    ov.innerHTML = `<div class="ch-res"><div class="obj-stamp fail">놓쳤다!</div>
+      <p>전화가 연결되고 말았어요. 처음부터 다시 쫓아가요!</p>
+      ${S.chaseFails >= 2 ? '<p class="easy">이번에는 시간을 2.5초 더 줄게요.</p>' : ''}
+      <button class="btn orange" id="chRetry">다시 도전</button></div>`;
+    $('#chRetry').addEventListener('click', () => render());
+    $('#chRetry').focus();
+  }
+}
 /* ---------- events ---------- */
 function bind() {
   $$('[data-go]', app).forEach(b => b.addEventListener('click', () => go(b.dataset.go)));
