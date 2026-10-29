@@ -167,11 +167,11 @@ $('#modal').addEventListener('click', e => { if (e.target.id === 'modal') closeM
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#modal').hidden) closeModal(); });
 
 let animateNext = true;
-function go(screen, fx = true) {
+function go(screen, fx = true, keepLine = false) {
   const i = stepIdx(screen);
   if (i > S.reached) screen = curId();
   if (screen === 'end' && !S.done.m5) screen = 'dash';
-  if (stepOf(screen) && stepOf(screen).type === 'scene' && S.screen !== screen) S.line = 0;
+  if (!keepLine && stepOf(screen) && stepOf(screen).type === 'scene' && S.screen !== screen) S.line = 0;
   S.screen = screen; save(); animateNext = true;
   if (fx) flash();
   render();
@@ -199,9 +199,23 @@ function renderHud() {
   $('#hudChances').innerHTML = Array.from({ length: MAX_CHANCES }, (_, i) => `<span class="mg ${i < S.chances ? '' : 'used'}">🔍</span>`).join('');
   $('#hudChances').title = chancesLeftText();
   $('#hudCount').textContent = `${S.locker.length}/${LOCKER_MAX}`;
+  const onDash = scr === 'dash';
+  $('#hudLocker').classList.toggle('on', onDash);
+  $('#hudLockerTxt').textContent = onDash ? '← 돌아가기' : '대시보드 · 증거';
+  $('#hudLocker').setAttribute('aria-label', onDash ? '하던 곳으로 돌아가기' : '사건 대시보드와 증거 보관함 열기');
 }
-$('#hudBack').addEventListener('click', () => go(S.screen === 'dash' ? 'title' : 'dash'));
-$('#hudLocker').addEventListener('click', showLocker);
+let returnTo = null, returnLine = null;
+$('#hudLocker').addEventListener('click', () => {
+  if (S.screen === 'dash' && !S.failed) {
+    const back = returnTo && returnTo !== 'dash' ? returnTo : (S.done.m5 ? 'end' : curId());
+    go(back, true, back === returnTo && returnLine !== null);
+    if (back === returnTo && returnLine !== null && stepOf(back) && stepOf(back).type === 'scene') { S.line = returnLine; save(); render(); }
+    return;
+  }
+  returnTo = S.failed ? null : S.screen;
+  returnLine = stepOf(S.screen) && stepOf(S.screen).type === 'scene' ? S.line : null;
+  go('dash');
+});
 
 function render() {
   stopRoundTimers();
@@ -278,6 +292,13 @@ function vDash() {
           ${S.done.m1 ? '<button class="btn ghost" data-go="m1">조사 기록 다시 보기</button>' : ''}
         </div>
       </div>
+    <div class="paper pad evbox tape">
+      <div class="evbox-head"><h3>🗂 증거 보관함 <b>${S.locker.length}/${LOCKER_MAX}</b></h3>
+        <span class="muted">카드를 누르면 자료를 자세히 볼 수 있어요.</span></div>
+      ${S.locker.length ? `<div class="bcards">${S.locker.map(id => `<button class="bcard" data-view="${id}"><div class="thumb" style="position:relative">${visual(id)}</div><div class="t">${esc(ev(id).title)}</div><div class="d">${esc(ev(id).period)}</div></button>`).join('')}</div>`
+        : `<p class="sub">아직 채택한 증거가 없어요. ${S.reached >= stepIdx('m1') ? '2장 ‘조사 기록 수집’에서 자료를 열고 ‘증거로 채택’을 눌러 보세요.' : '2장에서 자료를 모으게 돼요.'}</p>`}
+      ${S.done.m1 ? `<h4 class="evbox-sub">추가 수사 자료</h4><div class="bcards">${['E3', 'E4', 'E5'].filter(id => !S.locker.includes(id)).map(id => `<button class="bcard" data-view="${id}"><div class="thumb" style="position:relative">${visual(id)}</div><div class="t">${esc(ev(id).title)}</div><div class="d">${esc(ev(id).period)}</div></button>`).join('')}</div>` : ''}
+    </div>
       <div class="paper suspect tape">
         <div class="mug">${AV.park()}<span>1940.7.7 매일신보</span></div>
         <div>
@@ -308,6 +329,7 @@ function vDash() {
       </div>
       ${mascot(dashHint(), 'happy', 80)}
     </div>
+  </div>
   </div></section>`;
 }
 function dashHint() {

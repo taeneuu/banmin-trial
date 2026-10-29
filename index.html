@@ -11,16 +11,15 @@
 <link rel="preconnect" href="https://thumb.wikimedia.org">
 <link rel="preconnect" href="https://upload.wikimedia.org">
 <link href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Nanum+Pen+Script&family=Noto+Sans+KR:wght@400;500;700;900&family=Noto+Serif+KR:wght@500;700;900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=11">
+<link rel="stylesheet" href="style.css?v=12">
 </head>
 <body>
 <header class="hud" id="hud" hidden>
-  <button class="hud-back" id="hudBack" aria-label="사건 대시보드로">←</button>
   <div class="hud-title" id="hudTitle"></div>
   <div class="hud-right">
     <div class="hud-chances" id="hudChances" title="보완 조사 기회"></div>
-    <button class="hud-locker" id="hudLocker" aria-label="증거 보관함">
-      <span class="brief" aria-hidden="true"></span><span>증거 보관함</span><b id="hudCount">0/6</b>
+    <button class="hud-locker" id="hudLocker" aria-label="사건 대시보드와 증거 보관함 열기">
+      <span class="brief" aria-hidden="true"></span><span class="hl-txt" id="hudLockerTxt">대시보드 · 증거</span><b id="hudCount">0/6</b>
     </button>
   </div>
 </header>
@@ -43,9 +42,9 @@
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 <div class="flash" id="flash" aria-hidden="true"></div>
 
-<script src="data.js?v=11"></script>
-<script src="story.js?v=11"></script>
-<script src="images.js?v=11"></script>
-<script src="app.js?v=11"></script>
+<script src="data.js?v=12"></script>
+<script src="story.js?v=12"></script>
+<script src="images.js?v=12"></script>
+<script src="app.js?v=12"></script>
 </body>
 </html>

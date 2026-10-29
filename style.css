@@ -711,3 +711,36 @@ textarea{width:100%;min-height:130px;font:16px/1.7 var(--sans);padding:14px;bord
   .ch-runner{width:70px;height:70px}
   .ch-tap{min-height:150px}
 }
+
+/* ===== v8: dashboard in briefcase, portraits not covered ===== */
+.hud-locker{cursor:pointer}
+.hud-locker.on{background:var(--gold);color:var(--navy)}
+.hud-locker.on b{color:var(--navy)}
+.hud-locker.on .brief{background:var(--navy)}
+.hud-locker.on .brief::before{border-color:var(--navy)}
+.evbox{margin-bottom:10px}
+.evbox-head{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+.evbox-head h3{font:400 24px var(--display);color:var(--navy)}
+.evbox-head h3 b{color:var(--orange2)}
+.evbox-sub{font:700 15px var(--sans);color:var(--ink2);margin:18px 0 10px}
+.evbox .bcard::before{display:none}
+/* portrait sits fully above the dialogue box; name tag no longer covers it */
+.vn-cast{padding-bottom:26px;align-items:flex-end}
+.vn-box{margin-top:0}
+.vn-av{place-items:center}
+.vn-av svg{width:100%;height:100%}
+.vn-av.nuri svg{width:auto;height:88%;margin:0}
+.vn-av img.realphoto{object-fit:cover;object-position:50% 45%}
+.avcap{margin-bottom:0}
+@media (max-width:640px){
+  .hud-locker{padding:5px 10px;gap:6px;font-size:13px}
+  .hud-locker .hl-txt{display:inline!important}
+  .vn-cast{padding-bottom:24px}
+  .avcap{max-width:170px}
+}
+@media (max-width:360px){.hud-locker .hl-txt{font-size:12px}}
+.dash .evbox{margin-top:26px}
+@media (max-width:640px){
+  .suspect .stmp{position:static;display:inline-block;margin-bottom:6px;transform:rotate(-4deg);font-size:12px}
+  .suspect{grid-template-columns:84px 1fr}
+}
