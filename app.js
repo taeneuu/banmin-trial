@@ -1189,7 +1189,7 @@ function trialNext() {
 
 
 /* ---------- chapter 2: chase (tap mini-game) ---------- */
-const CHASE = { tap: 4, decay: 4, time: 7.5, easyTime: 10 };
+const CHASE = { tap: 4, decay: 4, time: 5, easyTime: 7.5 };
 let CH = null;
 function chaseTime() { return S.chaseFails >= 2 ? CHASE.easyTime : CHASE.time; }
 function stopChase() { if (CH && CH.timer) { clearInterval(CH.timer); CH.timer = null; } }
