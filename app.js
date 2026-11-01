@@ -8,7 +8,7 @@ const KEY = 'banmin-trial-v2';
 /* 선생님 제출용 Apps Script 웹 앱 주소 (광복 1945와 같은 스프레드시트, '반민특위 재판정' 시트에 저장). 바꾸려면 이 줄만 고치면 된다. */
 const SUBMIT_URL = 'https://script.google.com/macros/s/AKfycbyh_7Yly5B_uegiPNIdX8DtRPn2vvc4tA7PGyN4wqyhrB1G2-dQVJOlpbMNA_mX6s9d/exec';
 const MAX_CHANCES = 4;
-const LOCKER_MAX = 6;
+const LOCKER_MAX = 5;
 const MISSIONS = [
   { n: 1, short: '사건 파일', title: '사건 파일: 수사 개시', desc: '박흥식의 행적을 담은 자료를 열람하고, 혐의를 입증할 증거를 채택하세요.' },
   { n: 2, short: '증거 조합', title: '증거 조합: 연결되는 단서', desc: '증거와 증거, 증거와 법 조항을 이어 붙여 혐의를 세우세요.' },
@@ -38,7 +38,7 @@ const fresh = () => ({
   chances: MAX_CHANCES, mistakes: [],
   ind: { main: '', extra: [], ev: [], reason: '' },
   sent: { type: '', years: '', conf: '', reason: '' },
-  reflection: '', failed: false, name: '', submittedAt: '', flowVer: 2, chaseFails: 0,
+  reflection: '', failed: false, name: '', submittedAt: '', flowVer: 2, chaseFails: 0, order: null, m1hints: [],
 });
 let S = load();
 function load() {
@@ -353,8 +353,14 @@ function suspectSVG() {
 }
 
 /* ---------- MISSION 1 : desk ---------- */
+function shuffled(a) { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+function m1Order() {
+  const base = stageItems(1);
+  if (!S.order || S.order.length !== base.length || base.some(id => !S.order.includes(id))) { S.order = shuffled(base); save(); }
+  return S.done.m1 ? [...S.order, ...stageItems(2).filter(id => !base.includes(id))] : S.order;
+}
 function vM1() {
-  const items = stageItems(S.done.m1 ? 2 : 1);
+  const items = m1Order();
   const counts = { all: items.length };
   items.forEach(id => { const c = EVIDENCE_VISUAL[id].cat; counts[c] = (counts[c] || 0) + 1; });
   const shown = items.filter(id => S.cat === 'all' || EVIDENCE_VISUAL[id].cat === S.cat);
@@ -367,6 +373,7 @@ function vM1() {
       ${mascot(first ? '박흥식이 일제강점기에 무엇을 했는지 기록으로 확인해요. 관계없는 자료도 섞여 있어요!'
         : (S.done.m1 ? '이미 송치한 조사 기록이에요. 추가 자료 3건도 함께 있어요.' : '관련 없는 자료를 넣으면 조사보고서가 반려돼요. 신중하게!'), 'happy', 70)}
     </div>
+    ${(S.m1hints || []).length && !S.done.m1 ? `<div class="hintbox"><b>💡 받은 힌트</b><ol>${S.m1hints.map(h => `<li>${esc(h)}</li>`).join('')}</ol></div>` : ''}
     <div class="tabs">${CATS.filter(c => counts[c.id]).map(c => `<button class="${S.cat === c.id ? 'on' : ''}" data-cat="${c.id}">${c.name}<span>${counts[c.id]}</span></button>`).join('')}</div>
     <div class="evgrid">
       ${shown.map(id => {
@@ -414,7 +421,6 @@ function openViewer(id) {
         <div class="meta">작성 시기: ${esc(e.period)}</div>
         <div class="vfield key"><div class="lb">핵심 내용</div>${esc(e.content)}</div>
         <div class="vfield prove"><div class="lb">이 자료로 입증할 수 있는 사실</div>${esc(e.proves)}</div>
-        <div class="vfield warn"><div class="lb">주의할 점</div>${esc(e.caution)}</div>
         <div class="vsrc">원문 발췌: 미수록 (원문 자료 확보 필요) — 위 내용은 연구·사전 자료를 요약한 것이에요.<br>출처: ${e.source.map(esc).join(' / ')}</div>
         ${inL ? '<p style="margin-top:10px;font-weight:700;color:var(--orange2)">📌 보관함에 채택된 증거예요.</p>' : ''}
       </div></div>`, btns);
@@ -471,9 +477,16 @@ function submitM1() {
     return;
   }
   spend(1, issues);
+  if (!S.m1hints) S.m1hints = [];
+  const fresh1 = issues.find(i => !S.m1hints.includes(i.text)) || issues[0];
+  if (!S.m1hints.includes(fresh1.text)) S.m1hints.push(fresh1.text);
+  save();
   if (S.failed) { render(); return; }
   $('.tray') && $('.tray').classList.add('shake');
-  failModal('bad', '조사보고서가 반려됐어요', issues, [{ text: '다시 조사하기', fn: render }]);
+  modal(`<div class="modal-hero">${mascot('', 'sad', 100, false)}<div><span class="res bad">보완 조사 필요</span><h2 class="mt">조사보고서가 반려됐어요</h2>
+    <p class="sub">보고서에 고칠 점이 <b>${issues.length}가지</b> 있어요. 기회를 하나 쓴 대신, 선배 조사관이 힌트를 하나 줬어요.</p></div></div>
+    <div class="fix"><i>💡</i><div><b>힌트 ${S.m1hints.indexOf(fresh1.text) + 1}</b><br>${esc(fresh1.text)}</div></div>
+    <p class="muted">${chancesLeftText()} · 받은 힌트는 자료 목록 위에 계속 보여요.</p>`, [{ text: '다시 조사하기', fn: render }]);
 }
 
 /* ---------- MISSION 2 : investigation board ---------- */
@@ -1069,13 +1082,15 @@ function vTrial() {
       <div class="row" style="justify-content:flex-end"><button class="btn orange" data-act="trialnext">${T.round >= TRIAL.length - 1 ? '구형 의견으로 →' : '다음 반박 듣기 →'}</button></div></div>`;
   } else if (R.type === 'choice' || R.type === 'timed') {
     body = `<h3 class="sect-title tq">${esc(R.ask)}</h3>
-      ${R.type === 'timed' ? `<div class="timer"><div class="tfill" id="tfill"></div><span id="tsec">${R.seconds}초</span></div>` : ''}
+      ${R.seconds ? timerBar(R) : ''}
+      ${T.lastWhy && !R.opts.some(o => o.why === T.lastWhy) ? `<div class="tfeed shake">⏰ ${esc(T.lastWhy)}</div>` : ''}
       <div class="rebuts">${ORDERS[T.round % 5].map(i => [R.opts[i], i]).map(([o, i]) => { const w = T.wrong.includes(i);
         return `<button class="rebut ${w ? 'wrong' : ''}" data-rebut="${i}" ${w ? 'disabled' : ''}>
           <p>${esc(o.t)}</p>${evChips(o.ev)}${w ? `<div class="why">✗ ${esc(o.why)}</div>` : ''}</button>`; }).join('')}</div>`;
   } else if (R.type === 'evidence') {
     const { evs } = m2Pool();
     body = `<h3 class="sect-title tq">${esc(R.ask)}</h3>
+      ${R.seconds ? timerBar(R) : ''}
       ${T.lastWhy ? `<div class="tfeed shake">✗ ${esc(T.lastWhy)}</div>` : ''}
       <div class="evpick">${evs.map(id => { const w = T.wrong.includes(id);
         return `<button class="bcard ${T.picked === id ? 'sel' : ''} ${w ? 'used' : ''}" data-evpick="${id}" ${w ? 'disabled' : ''}>
@@ -1120,6 +1135,7 @@ function vTrial() {
     ${body}
   </div></section>`;
 }
+function timerBar(R) { return `<div class="timer"><div class="tfill" id="tfill"></div><span id="tsec">${R.seconds}초</span></div>`; }
 function evChips(evs) {
   return evs.length ? `<div class="evchips">${evs.map(e => `<span class="evchip"><span class="th">${miniVisual(e)}</span>${esc(ev(e).title)}</span>`).join('')}</div>`
     : '<div class="evchips"><span class="evchip none">제시할 증거 없음</span></div>';
@@ -1129,7 +1145,7 @@ function startRoundTimers() {
   const T = S.trial, R = TRIAL[T.round];
   if (!R || T.solved || S.screen !== 'trial') return;
   const slow = matchMedia('(prefers-reduced-motion: reduce)').matches ? 1.5 : 1;
-  if (R.type === 'timed') {
+  if (R.seconds && ['choice', 'evidence', 'timed'].includes(R.type)) {
     const total = R.seconds * slow;
     if (timeLeft === null) timeLeft = total;
     const paint = () => { const f = $('#tfill'), sec = $('#tsec'); if (f) f.style.width = (timeLeft / total * 100) + '%'; if (sec) sec.textContent = Math.ceil(timeLeft) + '초'; if (f) f.classList.toggle('low', timeLeft < 5); };
@@ -1152,7 +1168,14 @@ function startRoundTimers() {
       if (!$('#modal').hidden) { t0 = performance.now(); return; }
       const el = performance.now() - t0, fill = $('#testiFill');
       if (fill) fill.style.width = Math.min(100, el / speed * 100) + '%';
-      if (el >= speed) { tIdx = (tIdx + 1) % R.statements.length; t0 = performance.now(); show(); }
+      if (el >= speed) {
+        if (tIdx + 1 >= R.statements.length) {
+          stopRoundTimers(); tIdx = 0;
+          loseHp('증언이 끝날 때까지 이의를 제기하지 못했어요. 논리가 틀린 문장이 나올 때 바로 누르세요!', '증언이 한 바퀴 지나갈 때까지 이의를 제기하지 못했어요.');
+          return;
+        }
+        tIdx += 1; t0 = performance.now(); show();
+      }
     }, 50);
   }
 }
@@ -1173,14 +1196,14 @@ function pickRebut(i) {
   const T = S.trial, R = TRIAL[T.round], o = R.opts[i];
   if (o.ok) { solveRound(); return; }
   T.wrong.push(i);
-  if (R.type === 'timed') timeLeft = null;
+  if (R.seconds) timeLeft = null;
   loseHp(o.why);
 }
 function presentEvidence() {
   const T = S.trial, R = TRIAL[T.round], id = T.picked;
   if (!id) return;
   if (id === R.answer) { solveRound(); return; }
-  T.wrong.push(id); T.picked = null;
+  T.wrong.push(id); T.picked = null; if (R.seconds) timeLeft = null;
   loseHp((R.whyEv[id] || R.whyDefault), `‘${ev(id).title}’을(를) 제시했어요. ${R.whyEv[id] || R.whyDefault}`);
 }
 function objectNow() {
@@ -1206,9 +1229,9 @@ function trialNext() {
 
 
 /* ---------- chapter 2: chase (tap mini-game) ---------- */
-const CHASE = { tap: 4, decay: 4, time: 3.5 };
+const CHASE = { tap: 4, decay: 4, time: 3, easyTime: 3.5, easyAfter: 3 };
 let CH = null;
-function chaseTime() { return CHASE.time; }
+function chaseTime() { return S.chaseFails >= CHASE.easyAfter ? CHASE.easyTime : CHASE.time; }
 function stopChase() { if (CH && CH.timer) { clearInterval(CH.timer); CH.timer = null; } }
 function vChase() {
   return `<section class="scene chase-scene">${sceneBg('hwashin')}
@@ -1219,7 +1242,7 @@ function vChase() {
     <div class="chase" id="chase">
       <div class="ch-hud">
         <div class="ch-call"><span>☎ 전화 연결까지</span><div class="ch-bar"><div id="chCall"></div></div><b id="chSec">${chaseTime().toFixed(1)}초</b></div>
-        <div class="ch-tries">${S.chaseFails ? `실패 ${S.chaseFails}번` : '첫 도전'}</div>
+        <div class="ch-tries">${S.chaseFails ? `실패 ${S.chaseFails}번` : '첫 도전'}${S.chaseFails >= CHASE.easyAfter ? ' · <b>제한 시간 3.5초</b>' : ''}</div>
       </div>
       <div class="ch-track">
         <div class="ch-floor"></div>
@@ -1308,6 +1331,7 @@ function chaseEnd(win) {
     ov.className = 'ch-over fail';
     ov.innerHTML = `<div class="ch-res"><div class="obj-stamp fail">놓쳤다!</div>
       <p>전화가 연결되고 말았어요. 처음부터 다시 쫓아가요!</p>
+      ${S.chaseFails === CHASE.easyAfter ? '<p class="easy">이제부터 제한 시간이 3.5초로 늘어나요.</p>' : ''}
       <button class="btn orange" id="chRetry">다시 도전</button></div>`;
     $('#chRetry').addEventListener('click', () => render());
     $('#chRetry').focus();
