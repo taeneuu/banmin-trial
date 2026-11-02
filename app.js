@@ -309,7 +309,7 @@ function vDash() {
       ${S.done.m1 ? `<h4 class="evbox-sub">추가 수사 자료</h4><div class="bcards">${['E3', 'E4', 'E5'].filter(id => !S.locker.includes(id)).map(id => `<button class="bcard" data-view="${id}"><div class="thumb" style="position:relative">${visual(id)}</div><div class="t">${esc(ev(id).title)}</div><div class="d">${esc(ev(id).period)}</div></button>`).join('')}</div>` : ''}
     </div>
       <div class="paper suspect tape">
-        <div class="mug">${AV.park()}<span>1940.7.7 매일신보</span></div>
+        <div class="mug">${AV.park()}</div>
         <div>
           <h3>박흥식 <span style="font:500 15px var(--sans);color:var(--ink3)">朴興植 · 1903~1994</span></h3>
           <dl class="kv">
@@ -1012,7 +1012,7 @@ const AV = {
   inv: () => bust({ suit: '#5b4a33', hat: '#3a2f26', armband: true, tie: '#3a2f26' }),
   judge: () => bust({ suit: '#1e1e22', hair: 'M30 38q0-20 20-20t20 20q-6-12-20-12t-20 12z', hairc: '#d9d4cb', tie: '#1e1e22' }),
   lawyer: () => bust({ suit: '#6b6f78', hair: 'M30 36q2-18 20-18t20 18q-8-6-20-6t-20 6z', glasses: true, tie: '#5d7f9d' }),
-  park: () => `<img class="realphoto" src="${IMAGES.park1940.small}" alt="박흥식 (1940년 매일신보 사진)" loading="eager" decoding="async" data-fb="박흥식 사진">`,
+  park: () => `<img class="realphoto" src="${IMAGES.park1940.small}" alt="박흥식 사진" loading="eager" decoding="async" data-fb="박흥식 사진">`,
   nar: () => '<svg viewBox="0 0 100 100"><rect x="22" y="18" width="56" height="66" rx="4" fill="#f3e6c6" stroke="#6b5530" stroke-width="3"/><path d="M32 34h36M32 46h36M32 58h24" stroke="#9a8460" stroke-width="4"/><path d="M70 62l12-26 6 3-12 26-8 4z" fill="#a33a2b"/></svg>',
   nuri: mood => mascotSVG(mood || 'happy'),
 };
@@ -1037,7 +1037,7 @@ function vScene(id) {
       <span class="tag illut">교육용 재구성 · 대사는 기록을 바탕으로 다시 꾸몄어요</span>
     </div>
     ${photo ? `<figure class="vn-photo">${img(photo.photo, 'small', '', true)}<figcaption>${IMAGES[photo.photo].kind === 'source' ? '사료 사진' : '사진'}: ${esc(photo.photoNote || IMAGES[photo.photo].title + ' (' + IMAGES[photo.photo].date + ')')}</figcaption></figure>` : ''}
-    <div class="vn-cast">${!isNar ? `<div class="vn-av ${l.c}">${AV[c.av](l.mood)}</div>${l.c === 'park' ? '<div class="avcap">사료 사진: 1940년 7월 7일자 매일신보에 실린 박흥식<br>(장면 당시인 1949년 모습은 아님)</div>' : ''}` : ''}</div>
+    <div class="vn-cast">${!isNar ? `<div class="vn-av ${l.c}">${AV[c.av](l.mood)}</div>` : ''}</div>
     <div class="vn-box ${isNar ? 'nar' : ''}" id="vnBox" role="button" tabindex="0" aria-label="다음 대사">
       ${!isNar ? `<div class="vn-name">${esc(c.name)}${c.tag ? `<small>${esc(c.tag)}</small>` : ''}</div>` : ''}
       <p class="vn-text" id="vnText" data-full="${esc(lineText(l))}"></p>
@@ -1163,7 +1163,7 @@ function vTrial() {
     </div>
     <div class="bench">
       <div class="seat def ${!T.solved && R.who === 'lawyer' ? 'talk' : ''}"><div class="vn-av">${AV.lawyer()}</div><span>변호인</span></div>
-      <div class="seat def ${!T.solved && R.who === 'park' ? 'talk' : ''}"><div class="vn-av">${AV.park()}</div><span>피고인 박흥식<small class="seatcap">사진: 1940년 매일신보</small></span></div>
+      <div class="seat def ${!T.solved && R.who === 'park' ? 'talk' : ''}"><div class="vn-av">${AV.park()}</div><span>피고인 박흥식</span></div>
       <div class="seat judge ${T.solved && react.c === 'judge' ? 'talk' : ''}"><div class="vn-av">${AV.judge()}</div><span>재판장</span></div>
       <div class="seat pros ${T.solved ? 'talk' : ''}"><div class="vn-av">${AV.me()}</div><span>검찰관 (나)</span></div>
     </div>
