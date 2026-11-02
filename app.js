@@ -835,7 +835,7 @@ function vM5() {
       <p class="qsub">아래 영상을 끝까지 본 뒤 답해 보세요. 영상 속 장면이나 내 주변의 사례(학교·거리·기업·기념물 등)를 하나 들어, 왜 ‘청산되지 못한 과거’라고 생각하는지 2~3문장으로 써 보세요.</p>
       <div class="video"><iframe src="https://www.youtube-nocookie.com/embed/_X7h3UIMHPs" title="청산하지 못한 과거 관련 영상" loading="lazy" allow="accelerometer; encrypted-media; picture-in-picture; fullscreen" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe></div>
       <p class="vlink">영상이 나오지 않으면 <a href="https://youtu.be/_X7h3UIMHPs" target="_blank" rel="noopener">유튜브에서 직접 열기</a></p>
-      <textarea id="reflect2" placeholder="영상 속 장면이나 주변 사례를 들어 2~3문장으로 써 보세요. (20자 이상)">${esc(S.reflection2 || '')}</textarea>
+      <textarea id="reflect2" placeholder="영상 속 장면이나 주변 사례를 들어 2~3문장으로 써 보세요. (30자 이상)">${esc(S.reflection2 || '')}</textarea>
       <div class="row" style="justify-content:flex-end;margin-top:6px"><span class="muted" id="rcount2">${(S.reflection2 || '').trim().length}자</span></div>
       <div class="submitbox">
         <label for="stuName"><b>📮 선생님께 제출하기</b><span class="muted">학번과 이름을 쓰면 답이 선생님의 기록지에 저장돼요.</span></label>
@@ -880,7 +880,7 @@ function submitM5() {
   S.reflection = t; S.reflection2 = t2; S.name = nm; save();
   const msg = $('#submsg'), btn = $('#m5btn');
   if (t.length < 20) { toast('첫 번째 질문은 20자 이상 써야 제출할 수 있어요.'); $('#reflect').classList.add('shake'); return; }
-  if (t2.length < 20) { toast('두 번째 질문도 20자 이상 써야 제출할 수 있어요.'); $('#reflect2').classList.add('shake'); return; }
+  if (t2.length < 30) { toast('두 번째 질문은 30자 이상 써야 제출할 수 있어요.'); $('#reflect2').classList.add('shake'); return; }
   if (nm.length < 2 || !/\d/.test(nm)) { msg.className = 'submsg no'; msg.textContent = '학번과 이름을 함께 써 주세요. (예: 10305 김하늘)'; $('#stuName').focus(); $('#stuName').classList.add('shake'); return; }
   btn.disabled = true; btn.textContent = '보내는 중…'; msg.className = 'submsg'; msg.textContent = '잠시만 기다려 주세요.';
   sendSubmission(() => { toast('선생님께 제출했어요!'); finishCase(); }, () => {
