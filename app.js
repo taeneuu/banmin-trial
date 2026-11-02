@@ -38,7 +38,7 @@ const fresh = () => ({
   chances: MAX_CHANCES, mistakes: [],
   ind: { main: '', extra: [], ev: [], reason: '' },
   sent: { type: '', years: '', conf: '', reason: '' },
-  reflection: '', failed: false, name: '', submittedAt: '', flowVer: 2, chaseFails: 0, order: null, m1hints: [],
+  reflection: '', failed: false, name: '', submittedAt: '', flowVer: 2, chaseFails: 0, order: null, rorder: null, m1hints: [],
 });
 let S = load();
 function load() {
@@ -354,6 +354,10 @@ function suspectSVG() {
 
 /* ---------- MISSION 1 : desk ---------- */
 function shuffled(a) { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+function reasonOrder() {
+  if (!S.rorder || S.rorder.length !== REASONS.length || REASONS.some(r => !S.rorder.includes(r.id))) { S.rorder = shuffled(REASONS.map(r => r.id)); save(); }
+  return S.rorder.map(id => REASONS.find(r => r.id === id));
+}
 function m1Order() {
   const base = stageItems(1);
   if (!S.order || S.order.length !== base.length || base.some(id => !S.order.includes(id))) { S.order = shuffled(base); save(); }
@@ -623,8 +627,8 @@ function vM3() {
           <div class="chips">${evs.map(id => `<label class="chip"><input type="checkbox" name="ev" value="${id}" ${I.ev.includes(id) ? 'checked' : ''}><span class="bx"></span><span>${esc(ev(id).title)}<small>${esc(ev(id).period)}</small></span></label>`).join('')}</div>
           <div class="typed" id="tyEv"></div>
         </div>
-        <div class="isec"><h3><i>3</i>기소 이유</h3>
-          <div class="chips">${REASONS.map(r => `<label class="chip radio wide"><input type="radio" name="reason" value="${r.id}" ${I.reason === r.id ? 'checked' : ''}><span class="bx"></span><span>${esc(r.text)}</span></label>`).join('')}</div>
+        <div class="isec"><h3><i>3</i>기소 이유 <span class="muted">(핵심 혐의 하나)</span></h3>
+          <div class="chips">${reasonOrder().map(r => `<label class="chip radio wide"><input type="radio" name="reason" value="${r.id}" ${I.reason === r.id ? 'checked' : ''}><span class="bx"></span><span>${esc(r.text)}</span></label>`).join('')}</div>
           <div class="typed" id="tyReason"></div>
         </div>
         <div class="row" style="justify-content:space-between;margin-top:18px;font-family:var(--sans)">
