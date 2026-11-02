@@ -750,3 +750,4 @@ textarea{width:100%;min-height:130px;font:16px/1.7 var(--sans);padding:14px;bord
 .hintbox b{color:#7a5508}
 .hintbox ol{margin:6px 0 0;padding-left:20px}
 .hintbox li{margin:3px 0}
+.ch-tap{touch-action:none}

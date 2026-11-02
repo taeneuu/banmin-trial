@@ -1229,7 +1229,7 @@ function trialNext() {
 
 
 /* ---------- chapter 2: chase (tap mini-game) ---------- */
-const CHASE = { tap: 4, decay: 4, time: 3, easyTime: 3.5, easyAfter: 3 };
+const CHASE = { tap: 4, decay: 4, time: 2.5, easyTime: 3, easyAfter: 3 };
 let CH = null;
 function chaseTime() { return S.chaseFails >= CHASE.easyAfter ? CHASE.easyTime : CHASE.time; }
 function stopChase() { if (CH && CH.timer) { clearInterval(CH.timer); CH.timer = null; } }
@@ -1242,7 +1242,7 @@ function vChase() {
     <div class="chase" id="chase">
       <div class="ch-hud">
         <div class="ch-call"><span>☎ 전화 연결까지</span><div class="ch-bar"><div id="chCall"></div></div><b id="chSec">${chaseTime().toFixed(1)}초</b></div>
-        <div class="ch-tries">${S.chaseFails ? `실패 ${S.chaseFails}번` : '첫 도전'}${S.chaseFails >= CHASE.easyAfter ? ' · <b>제한 시간 3.5초</b>' : ''}</div>
+        <div class="ch-tries">${S.chaseFails ? `실패 ${S.chaseFails}번` : '첫 도전'}${S.chaseFails >= CHASE.easyAfter ? ` · <b>제한 시간 ${CHASE.easyTime}초</b>` : ''}</div>
       </div>
       <div class="ch-track">
         <div class="ch-floor"></div>
@@ -1254,7 +1254,7 @@ function vChase() {
       <button class="ch-tap" id="chTap" type="button" aria-label="달리기 (연타)">
         <span class="big">🏃 다다다닥!</span><span class="sm" id="chTapSm">눌러서 시작</span>
       </button>
-      <p class="muted ch-help">컴퓨터에서는 스페이스바를 연타해도 돼요. 실패해도 보완 조사 기회는 줄지 않아요.</p>
+      <p class="muted ch-help">휴대폰은 두 손가락으로 번갈아 누르면 더 빨라요. 컴퓨터에서는 스페이스바를 연타해도 돼요. 실패해도 보완 조사 기회는 줄지 않아요.</p>
     </div>
   </div></section>`;
 }
@@ -1331,7 +1331,7 @@ function chaseEnd(win) {
     ov.className = 'ch-over fail';
     ov.innerHTML = `<div class="ch-res"><div class="obj-stamp fail">놓쳤다!</div>
       <p>전화가 연결되고 말았어요. 처음부터 다시 쫓아가요!</p>
-      ${S.chaseFails === CHASE.easyAfter ? '<p class="easy">이제부터 제한 시간이 3.5초로 늘어나요.</p>' : ''}
+      ${S.chaseFails === CHASE.easyAfter ? `<p class="easy">이제부터 제한 시간이 ${CHASE.easyTime}초로 늘어나요.</p>` : ''}
       <button class="btn orange" id="chRetry">다시 도전</button></div>`;
     $('#chRetry').addEventListener('click', () => render());
     $('#chRetry').focus();
