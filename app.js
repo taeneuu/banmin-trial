@@ -394,7 +394,7 @@ function vM1() {
       ${Array.from({ length: Math.max(0, LOCKER_MAX - S.locker.length) }, () => '<div class="slot"></div>').join('')}
     </div>
     ${S.done.m1 ? `<button class="btn orange" data-go="${curId()}">이어서 하기 →</button>`
-      : `<button class="btn orange" data-act="m1submit" ${S.locker.length ? '' : 'disabled'}>조사보고서 송치</button>`}
+      : `<button class="btn orange" data-act="m1submit" ${S.locker.length >= LOCKER_MAX ? '' : 'disabled'}>${S.locker.length >= LOCKER_MAX ? '조사보고서 송치' : `증거 ${LOCKER_MAX - S.locker.length}개 더 채택`}</button>`}
   </div></div>`;
 }
 function miniVisual(id) {
@@ -466,6 +466,7 @@ function winModal(stamp, title, body, next) {
 }
 
 function submitM1() {
+  if (S.locker.length < LOCKER_MAX) { toast(`증거 ${LOCKER_MAX}개를 모두 채택해야 송치할 수 있어요.`); return; }
   const L = S.locker; const issues = [];
   if (!L.includes('E1')) issues.push({ text: '피의자가 경영한 군수 회사에 대한 기록이 빠졌어요. 박흥식이 어떤 회사를 세우고 무슨 자리에 있었는지 확인해요.', recheck: ['E1'] });
   if (!L.includes('E2')) issues.push({ text: '그 회사가 ‘군수’ 회사였다는 근거가 없어요. 회사의 성격을 보여 주는 문서를 찾아봐요.', recheck: ['E2'] });
@@ -1229,9 +1230,10 @@ function trialNext() {
 
 
 /* ---------- chapter 2: chase (tap mini-game) ---------- */
-const CHASE = { tap: 4, decay: 4, time: 2.5, easyTime: 3, easyAfter: 3 };
+const CHASE = { tap: 4, decay: 4, steps: [[0, 2], [3, 2.5], [4, 3]] };
 let CH = null;
-function chaseTime() { return S.chaseFails >= CHASE.easyAfter ? CHASE.easyTime : CHASE.time; }
+function chaseTime() { let t = CHASE.steps[0][1]; CHASE.steps.forEach(([f, v]) => { if ((S.chaseFails || 0) >= f) t = v; }); return t; }
+function chaseNextNote() { const f = S.chaseFails || 0; const st = CHASE.steps.find(x => x[0] === f && f > 0); return st ? `이제부터 제한 시간이 ${st[1]}초로 늘어나요.` : ''; }
 function stopChase() { if (CH && CH.timer) { clearInterval(CH.timer); CH.timer = null; } }
 function vChase() {
   return `<section class="scene chase-scene">${sceneBg('hwashin')}
@@ -1242,7 +1244,7 @@ function vChase() {
     <div class="chase" id="chase">
       <div class="ch-hud">
         <div class="ch-call"><span>☎ 전화 연결까지</span><div class="ch-bar"><div id="chCall"></div></div><b id="chSec">${chaseTime().toFixed(1)}초</b></div>
-        <div class="ch-tries">${S.chaseFails ? `실패 ${S.chaseFails}번` : '첫 도전'}${S.chaseFails >= CHASE.easyAfter ? ` · <b>제한 시간 ${CHASE.easyTime}초</b>` : ''}</div>
+        <div class="ch-tries">${S.chaseFails ? `실패 ${S.chaseFails}번` : '첫 도전'}${S.chaseFails >= 3 ? ` · <b>제한 시간 ${chaseTime()}초</b>` : ''}</div>
       </div>
       <div class="ch-track">
         <div class="ch-floor"></div>
@@ -1309,10 +1311,10 @@ function paintChase() {
   const total = chaseTime();
   const r = $('#chRunner'), c = $('#chCall'), sec = $('#chSec'), pct = $('#chPct'), ph = $('#chPhone');
   if (r) r.style.left = `calc(${CH.pos} * (100% - ${innerWidth <= 640 ? 186 : 266}px) / 100 + 8px)`;
-  if (c) { c.style.width = (100 - CH.left / total * 100) + '%'; c.classList.toggle('low', CH.left < 2.5); }
+  if (c) { c.style.width = (100 - CH.left / total * 100) + '%'; c.classList.toggle('low', CH.left < total * .5); }
   if (sec) sec.textContent = CH.left.toFixed(1) + '초';
   if (pct) pct.textContent = Math.round(CH.pos) + '%';
-  if (ph) ph.classList.toggle('ring', CH.phase === 'run' && CH.left < 3);
+  if (ph) ph.classList.toggle('ring', CH.phase === 'run' && CH.left < total * .6);
 }
 function chaseEnd(win) {
   stopChase(); CH.phase = win ? 'win' : 'fail'; paintChase();
@@ -1331,7 +1333,7 @@ function chaseEnd(win) {
     ov.className = 'ch-over fail';
     ov.innerHTML = `<div class="ch-res"><div class="obj-stamp fail">놓쳤다!</div>
       <p>전화가 연결되고 말았어요. 처음부터 다시 쫓아가요!</p>
-      ${S.chaseFails === CHASE.easyAfter ? `<p class="easy">이제부터 제한 시간이 ${CHASE.easyTime}초로 늘어나요.</p>` : ''}
+      ${chaseNextNote() ? `<p class="easy">${chaseNextNote()}</p>` : ''}
       <button class="btn orange" id="chRetry">다시 도전</button></div>`;
     $('#chRetry').addEventListener('click', () => render());
     $('#chRetry').focus();
