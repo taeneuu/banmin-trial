@@ -12,10 +12,10 @@ function doPost(e) {
     const sh = ss.getSheetByName('반민특위 재판정') || ss.insertSheet('반민특위 재판정');
     if (sh.getLastRow() === 0) {
       sh.appendRow(['제출 시각', '학번 이름', '적용 조항', '제출 증거', '기소 이유',
-                    '구형', '쟁점 발견', '보완 조사 사용', '성찰 답변', '전체 기록']);
+                    '구형', '쟁점 발견', '보완 조사 사용', '성찰 답변', '전체 기록', '성찰 답변 2']);
     }
     sh.appendRow([new Date(), d.name, d.laws, d.evidence, d.reason,
-                  d.sentence, d.issue, d.chances, d.reflection, d.all]);
+                  d.sentence, d.issue, d.chances, d.reflection, d.all, d.reflection2 || '']);
     return ContentService.createTextOutput('ok');
   }
 

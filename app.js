@@ -38,7 +38,7 @@ const fresh = () => ({
   chances: MAX_CHANCES, mistakes: [],
   ind: { main: '', extra: [], ev: [], reason: '' },
   sent: { type: '', years: '', conf: '', reason: '' },
-  reflection: '', failed: false, name: '', submittedAt: '', flowVer: 2, chaseFails: 0, order: null, rorder: null, m1hints: [],
+  reflection: '', failed: false, name: '', submittedAt: '', flowVer: 2, reflection2: '', chaseFails: 0, order: null, rorder: null, m1hints: [],
 });
 let S = load();
 function load() {
@@ -830,6 +830,13 @@ function vM5() {
       <p class="q">친일 행위를 입증할 증거와 처벌할 법이 있었는데도, 친일 청산은 왜 충분히 이루어지지 못했을까?</p>
       <textarea id="reflect" placeholder="위 연표에서 찾은 근거를 들어 2~3문장으로 써 보세요. (20자 이상)">${esc(S.reflection)}</textarea>
       <div class="row" style="justify-content:flex-end;margin-top:6px"><span class="muted" id="rcount">${S.reflection.trim().length}자</span></div>
+      <hr class="qsep">
+      <p class="q"><span class="qno">두 번째 질문</span>청산하지 못한 과거는 오늘날 우리 사회에 어떤 모습으로 남아 있을까?</p>
+      <p class="qsub">아래 영상을 끝까지 본 뒤 답해 보세요. 영상 속 장면이나 내 주변의 사례(학교·거리·기업·기념물 등)를 하나 들어, 왜 ‘청산되지 못한 과거’라고 생각하는지 2~3문장으로 써 보세요.</p>
+      <div class="video"><iframe src="https://www.youtube-nocookie.com/embed/_X7h3UIMHPs" title="청산하지 못한 과거 관련 영상" loading="lazy" allow="accelerometer; encrypted-media; picture-in-picture; fullscreen" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe></div>
+      <p class="vlink">영상이 나오지 않으면 <a href="https://youtu.be/_X7h3UIMHPs" target="_blank" rel="noopener">유튜브에서 직접 열기</a></p>
+      <textarea id="reflect2" placeholder="영상 속 장면이나 주변 사례를 들어 2~3문장으로 써 보세요. (20자 이상)">${esc(S.reflection2 || '')}</textarea>
+      <div class="row" style="justify-content:flex-end;margin-top:6px"><span class="muted" id="rcount2">${(S.reflection2 || '').trim().length}자</span></div>
       <div class="submitbox">
         <label for="stuName"><b>📮 선생님께 제출하기</b><span class="muted">학번과 이름을 쓰면 답이 선생님의 기록지에 저장돼요.</span></label>
         <div class="subrow"><input id="stuName" maxlength="20" autocomplete="off" placeholder="학번 이름 (예: 10305 김하늘)" value="${esc(S.name || '')}"></div>
@@ -854,6 +861,7 @@ function submitData() {
     issue: S.found.ISSUE ? '예' : '아니오',
     chances: `${MAX_CHANCES - S.chances}번`,
     reflection: S.reflection,
+    reflection2: S.reflection2 || '',
     all: summaryText(),
   };
 }
@@ -868,9 +876,11 @@ function submitM5() {
   if (S.submittedAt) { finishCase(); return; }
   const t = ($('#reflect').value || '').trim();
   const nm = ($('#stuName').value || '').trim();
-  S.reflection = t; S.name = nm; save();
+  const t2 = ($('#reflect2').value || '').trim();
+  S.reflection = t; S.reflection2 = t2; S.name = nm; save();
   const msg = $('#submsg'), btn = $('#m5btn');
-  if (t.length < 20) { toast('20자 이상 써야 제출할 수 있어요.'); $('#reflect').classList.add('shake'); return; }
+  if (t.length < 20) { toast('첫 번째 질문은 20자 이상 써야 제출할 수 있어요.'); $('#reflect').classList.add('shake'); return; }
+  if (t2.length < 20) { toast('두 번째 질문도 20자 이상 써야 제출할 수 있어요.'); $('#reflect2').classList.add('shake'); return; }
   if (nm.length < 2 || !/\d/.test(nm)) { msg.className = 'submsg no'; msg.textContent = '학번과 이름을 함께 써 주세요. (예: 10305 김하늘)'; $('#stuName').focus(); $('#stuName').classList.add('shake'); return; }
   btn.disabled = true; btn.textContent = '보내는 중…'; msg.className = 'submsg'; msg.textContent = '잠시만 기다려 주세요.';
   sendSubmission(() => { toast('선생님께 제출했어요!'); finishCase(); }, () => {
@@ -888,7 +898,8 @@ function summaryText() {
     `구형: ${sentenceText()}`,
     `학번 이름: ${S.name || '(미입력)'}`,
     `쟁점 발견: ${S.found.ISSUE ? '예' : '아니오'} / 사용한 보완 조사: ${MAX_CHANCES - S.chances}번`,
-    `성찰: ${S.reflection}`].join('\n');
+    `성찰 1: ${S.reflection}`,
+    `성찰 2: ${S.reflection2 || ''}`].join('\n');
 }
 
 /* ---------- END / FAIL ---------- */
@@ -912,7 +923,8 @@ function vEnd() {
         <dt>기소 이유</dt><dd>${esc((REASONS.find(r => r.id === I.reason) || {}).text || '')}</dd>
         <dt>구형</dt><dd>${esc(sentenceText())}</dd>
         <dt>장별 결과</dt><dd>${CHAPTERS.map(c => `${c.n}장 ${c.title} ${FLOW.filter(f => f.ch === c.n).every(f => S.done[f.id]) ? '✓' : '—'}`).join('<br>')}${S.mistakes.length ? `<br><span class="muted">보완 조사 ${S.mistakes.length}번 사용</span>` : ''}</dd>
-        <dt>나의 답변</dt><dd style="white-space:pre-wrap">${esc(S.reflection)}</dd>
+        <dt>나의 답변 1</dt><dd style="white-space:pre-wrap">${esc(S.reflection)}</dd>
+        <dt>나의 답변 2</dt><dd style="white-space:pre-wrap">${esc(S.reflection2 || '')}</dd>
       </dl>
       <div class="big-stamp in" style="bottom:30px">起訴</div>
     </div>
@@ -1383,6 +1395,8 @@ function bind() {
   if (sn) { sn.addEventListener('input', () => { S.name = sn.value.trim(); save(); }); sn.addEventListener('keydown', e => { if (e.key === 'Enter') submitM5(); }); }
   const ta = $('#reflect');
   if (ta) ta.addEventListener('input', () => { S.reflection = ta.value; $('#rcount').textContent = ta.value.trim().length + '자'; save(); });
+  const ta2 = $('#reflect2');
+  if (ta2) ta2.addEventListener('input', () => { S.reflection2 = ta2.value; $('#rcount2').textContent = ta2.value.trim().length + '자'; save(); });
 
   $$('[data-act]', app).forEach(b => b.addEventListener('click', () => {
     const a = b.dataset.act;

@@ -761,3 +761,12 @@ textarea{width:100%;min-height:130px;font:16px/1.7 var(--sans);padding:14px;bord
 @media (prefers-reduced-motion:reduce){.chip.hl{animation:none}}
 
 .dashhint{font:500 12px var(--sans);color:var(--ink3);margin-left:6px;white-space:normal}
+
+/* 마지막 질문 2 + 영상 */
+.qsep{border:0;border-top:2px dashed var(--line);margin:22px 0 14px}
+.qno{display:block;font:800 12px var(--sans);color:var(--orange2);margin-bottom:2px}
+.qsub{font:500 14px/1.6 var(--sans);color:var(--ink2,#4a4034);margin:6px 0 10px}
+.video{position:relative;width:100%;aspect-ratio:16/9;background:#000;border-radius:10px;overflow:hidden}
+.video iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
+.vlink{font:500 12px var(--sans);color:var(--ink3);margin:6px 0 12px}
+.vlink a{color:var(--orange2);text-decoration:underline}
