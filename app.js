@@ -180,6 +180,7 @@ function go(screen, fx = true, keepLine = false) {
   if (i > S.reached) screen = curId();
   if (screen === 'end' && !S.done.m5) screen = 'dash';
   if (!keepLine && stepOf(screen) && stepOf(screen).type === 'scene' && S.screen !== screen) S.line = 0;
+  if (screen === 'm3' && S.screen !== 'm3') delete ORD.m3ev;
   S.screen = screen; save(); animateNext = true;
   if (fx) flash();
   render();
@@ -362,6 +363,11 @@ function suspectSVG() {
 
 /* ---------- MISSION 1 : desk ---------- */
 function shuffled(a) { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+const ORD = {};
+function ordered(key, arr) {
+  if (!ORD[key] || ORD[key].length !== arr.length) ORD[key] = shuffled(arr.map((_, i) => i));
+  return ORD[key].map(i => arr[i]);
+}
 function reasonOrder() {
   if (!S.rorder || S.rorder.length !== REASONS.length || REASONS.some(r => !S.rorder.includes(r.id))) { S.rorder = shuffled(REASONS.map(r => r.id)); save(); }
   return S.rorder.map(id => REASONS.find(r => r.id === id));
@@ -635,7 +641,7 @@ function vM3() {
           <div class="typed" id="tyLaw"></div>
         </div>
         <div class="isec"><h3><i>2</i>혐의를 뒷받침하는 증거 <span class="muted">(여러 개)</span> <small class="dashhint">우측 상단 대시보드를 눌러 참고하세요</small></h3>
-          <div class="chips">${evs.map(id => `<label class="chip${hl(2, id === 'E1' || id === 'E2')}"><input type="checkbox" name="ev" value="${id}" ${I.ev.includes(id) ? 'checked' : ''}><span class="bx"></span><span>${esc(ev(id).title)}<small>${esc(ev(id).period)}</small></span></label>`).join('')}</div>
+          <div class="chips">${ordered('m3ev', evs).map(id => `<label class="chip${hl(2, id === 'E1' || id === 'E2')}"><input type="checkbox" name="ev" value="${id}" ${I.ev.includes(id) ? 'checked' : ''}><span class="bx"></span><span>${esc(ev(id).title)}<small>${esc(ev(id).period)}</small></span></label>`).join('')}</div>
           <div class="typed" id="tyEv"></div>
         </div>
         <div class="isec"><h3><i>3</i>기소 이유 <span class="muted">(핵심 혐의 하나)</span></h3>
@@ -1111,7 +1117,7 @@ function vTrial() {
     body = `<h3 class="sect-title tq">${esc(R.ask)}</h3>
       ${R.seconds ? timerBar(R) : ''}
       ${T.lastWhy && !R.opts.some(o => o.why === T.lastWhy) ? `<div class="tfeed shake">⏰ ${esc(T.lastWhy)}</div>` : ''}
-      <div class="rebuts">${ORDERS[T.round % 5].map(i => [R.opts[i], i]).map(([o, i]) => { const w = T.wrong.includes(i);
+      <div class="rebuts">${ordered(`c${T.round}:${S.mistakes.length}`, R.opts.map((o, i) => [o, i])).map(([o, i]) => { const w = T.wrong.includes(i);
         return `<button class="rebut ${w ? 'wrong' : ''}" data-rebut="${i}" ${w ? 'disabled' : ''}>
           <p>${esc(o.t)}</p>${evChips(o.ev)}${w ? `<div class="why">✗ ${esc(o.why)}</div>` : ''}</button>`; }).join('')}</div>`;
   } else if (R.type === 'evidence') {
@@ -1119,7 +1125,7 @@ function vTrial() {
     body = `<h3 class="sect-title tq">${esc(R.ask)}</h3>
       ${R.seconds ? timerBar(R) : ''}
       ${T.lastWhy ? `<div class="tfeed shake">✗ ${esc(T.lastWhy)}</div>` : ''}
-      <div class="evpick">${evs.map(id => { const w = T.wrong.includes(id);
+      <div class="evpick">${ordered(`e${T.round}:${S.mistakes.length}`, evs).map(id => { const w = T.wrong.includes(id);
         return `<button class="bcard ${T.picked === id ? 'sel' : ''} ${w ? 'used' : ''}" data-evpick="${id}" ${w ? 'disabled' : ''}>
           <div class="thumb" style="position:relative">${visual(id)}</div><div class="t">${esc(ev(id).title)}</div><div class="d">${esc(ev(id).period)}</div></button>`; }).join('')}</div>
       <div class="row present"><span class="muted">${T.picked ? '고른 증거: <b>' + esc(ev(T.picked).title) + '</b>' : '증거 카드를 하나 고르세요.'}</span>
@@ -1136,7 +1142,7 @@ function vTrial() {
   } else if (R.type === 'sort') {
     body = `<h3 class="sect-title tq">${esc(R.ask)}</h3>
       ${T.lastWhy ? `<div class="tfeed shake">✗ ${esc(T.lastWhy)}</div>` : ''}
-      <div class="sorts">${R.items.map((it, i) => { const done = T.sorted && T.sorted[i];
+      <div class="sorts">${ordered(`s${T.round}:${S.mistakes.length}`, R.items.map((it, i) => [it, i])).map(([it, i]) => { const done = T.sorted && T.sorted[i];
         return `<div class="sortrow ${done ? 'ok' : ''}"><p>${esc(it.t)}</p>
           ${done ? `<span class="tag ${it.fact ? 'biz' : 'issue'}">${it.fact ? '확인된 사실' : '확인되지 않은 주장'}</span>`
             : `<div class="row"><button class="btn teal small" data-sort="${i}:1">확인된 사실</button><button class="btn small" data-sort="${i}:0">확인되지 않은 주장</button></div>`}</div>`; }).join('')}</div>`;
