@@ -96,10 +96,18 @@ document.addEventListener('error', e => {
     t.replaceWith(d);
   }
 }, true);
+function infoBtn(title, text, cls = '') {
+  return `<button type="button" class="info-btn ${cls}" data-infot="${esc(title)}" data-info="${esc(text)}" aria-label="${esc(title)} 보기" title="${esc(title)}">ⓘ</button>`;
+}
+document.addEventListener('click', e => {
+  const b = e.target.closest && e.target.closest('.info-btn'); if (!b) return;
+  e.stopPropagation();
+  modal(`<h2 class="mt" style="font-size:18px">${b.dataset.infot}</h2><p class="sub" style="white-space:pre-line">${esc(b.dataset.info)}</p>`, [{ text: '닫기' }], { narrow: true });
+}, true);
 function sceneBg(key, size = 'big') {
   const im = IMAGES[key];
   return `<div class="scene-bg" aria-hidden="true">${img(key, size, '', true)}</div>
-    <div class="photo-credit">배경 사진: ${esc(im.title)} (${esc(im.date)}) · ${esc(im.credit)}</div>`;
+    ${infoBtn('배경 사진 출처', `${im.title} (${im.date})\n${im.credit}\n\n전체 출처는 화면 아래 ‘자료·이미지 출처’에서 볼 수 있어요.`, 'scene-info')}`;
 }
 
 /* illustration thumbnails (clearly not historical records) */
@@ -1019,9 +1027,8 @@ function vScene(id) {
     <div class="vn-box ${isNar ? 'nar' : ''}" id="vnBox" role="button" tabindex="0" aria-label="다음 대사">
       ${!isNar ? `<div class="vn-name">${esc(c.name)}${c.tag ? `<small>${esc(c.tag)}</small>` : ''}</div>` : ''}
       <p class="vn-text" id="vnText" data-full="${esc(lineText(l))}"></p>
-      ${l.src ? `<div class="vn-src">기록 근거: ${esc(l.src)}</div>` : (!isNar && l.c !== 'nuri' ? '<div class="vn-src">게임 진행을 위해 만든 대사예요.</div>' : '')}
       <div class="vn-ctrl">
-        <span class="muted">${i + 1} / ${sc.lines.length}</span>
+        <span class="muted">${l.src ? infoBtn('기록 근거', l.src) : (!isNar && l.c !== 'nuri' ? infoBtn('이 대사는', '게임 진행을 위해 만든 대사예요.') : '')} ${i + 1} / ${sc.lines.length}</span>
         <div class="row">
           ${i > 0 ? '<button class="btn ghost small" data-act="vnprev">◀ 이전</button>' : ''}
           <button class="btn ${last ? 'orange' : ''} small" data-act="vnnext">${last ? (S.done[id] ? '닫기' : '계속 →') : '다음 ▶'}</button>
@@ -1059,13 +1066,13 @@ function vOrgans() {
       <div class="ocol">${ORGANS.map(o => `<button class="ocard ${O.sel === o.id ? 'sel' : ''} ${O.matched[o.id] ? 'ok' : ''}" data-organ="${o.id}" ${O.matched[o.id] ? 'disabled' : ''}>
         <span class="oi">${o.icon}</span><b>${esc(o.name)}</b>${O.matched[o.id] ? `<small>✓ ${esc(ORGAN_ROLES.find(r => r.id === o.role).text)}</small>` : ''}</button>`).join('')}</div>
       <div class="ocol roles"><div class="ohint">${S.organ.sel ? `‘${esc(ORGANS.find(o => o.id === S.organ.sel).name)}’이(가) 하는 일은?` : '기관을 먼저 고르세요'}</div>${ORGAN_ROLES.map(r => { const used = Object.values(O.matched).includes(r.id);
-        return `<button class="rcard ${used ? 'ok' : ''}" data-role="${r.id}" ${used ? 'disabled' : ''}>${esc(r.text)}<small>근거: ${esc(r.src)}</small></button>`; }).join('')}</div>
+        return `<button class="rcard ${used ? 'ok' : ''}" data-role="${r.id}" ${used ? 'disabled' : ''}>${esc(r.text)}</button>`; }).join('')}<div class="orole-info">${infoBtn('기관 역할의 근거', ORGAN_ROLES.map(r => `· ${r.text}\n  근거: ${r.src}`).join('\n'))} <span class="muted">근거 보기</span></div></div>
     </div>
     ${allMatched ? `<div class="paper pad quiz enter">
       <h3>${esc(ORGAN_QUIZ.q)}</h3>
       <div class="pen" style="margin-top:12px">${ORGAN_QUIZ.opts.map((q, i) => `<button class="chip ${O.quiz === i ? (q.ok ? 'right' : 'wrongc') : ''}" data-quiz="${i}">${esc(q.t)}</button>`).join('')}</div>
       ${O.quiz !== null && O.quiz !== undefined ? `<div class="result ${ORGAN_QUIZ.opts[O.quiz].ok ? 'r-valid' : 'r-wrong'}"><p>${esc(ORGAN_QUIZ.opts[O.quiz].why)}</p></div>` : ''}
-      <p class="muted" style="margin-top:8px">근거: ${esc(ORGAN_QUIZ.src)}</p>
+      <p class="muted" style="margin-top:8px">${infoBtn('근거', ORGAN_QUIZ.src)} <span>근거 보기</span></p>
       <div class="row" style="justify-content:flex-end;margin-top:10px"><button class="btn orange" data-act="organdone" ${O.quiz !== null && O.quiz !== undefined && ORGAN_QUIZ.opts[O.quiz].ok ? '' : 'disabled'}>다음 →</button></div>
     </div>` : ''}
   </div></section>`;
@@ -1149,8 +1156,8 @@ function vTrial() {
     ${R.type !== 'testimony' || T.solved ? `<div class="claim ${T.solved ? 'dim' : ''}">
       <div class="vn-name">${esc(c.name)}<small>${R.who === 'park' ? '피고인 · 실존 인물' : '피고 측'}</small></div>
       <p>${R.type === 'testimony' ? esc(R.statements.map(x => x.t).join(' ')) : '“' + esc(R.claim) + '”'}</p>
-      <div class="vn-src">기록 근거: ${esc(R.src)}</div></div>`
-    : `<div class="claim"><div class="vn-name">${esc(c.name)}<small>피고 측</small></div><p style="font-size:16px">${esc(R.claim)}</p><div class="vn-src">기록 근거: ${esc(R.src)}</div></div>`}
+      ${infoBtn('기록 근거', R.src, 'claim-info')}</div>`
+    : `<div class="claim"><div class="vn-name">${esc(c.name)}<small>피고 측</small></div><p style="font-size:16px">${esc(R.claim)}</p>${infoBtn('기록 근거', R.src, 'claim-info')}</div>`}
     ${body}
   </div></section>`;
 }
