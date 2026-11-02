@@ -38,7 +38,7 @@ const fresh = () => ({
   chances: MAX_CHANCES, mistakes: [],
   ind: { main: '', extra: [], ev: [], reason: '' },
   sent: { type: '', years: '', conf: '', reason: '' },
-  reflection: '', failed: false, name: '', submittedAt: '', flowVer: 2, reflection2: '', chaseFails: 0, order: null, rorder: null, m1hints: [],
+  reflection: '', failed: false, name: '', submittedAt: '', flowVer: 2, reflection2: '', chaseFails: 0, order: null, rorder: null, sorder: null, m1hints: [],
 });
 let S = load();
 function load() {
@@ -367,6 +367,10 @@ const ORD = {};
 function ordered(key, arr) {
   if (!ORD[key] || ORD[key].length !== arr.length) ORD[key] = shuffled(arr.map((_, i) => i));
   return ORD[key].map(i => arr[i]);
+}
+function sreasonOrder() {
+  if (!S.sorder || S.sorder.length !== SENT_REASONS.length || SENT_REASONS.some(r => !S.sorder.includes(r.id))) { S.sorder = shuffled(SENT_REASONS.map(r => r.id)); save(); }
+  return S.sorder.map(id => SENT_REASONS.find(r => r.id === id));
 }
 function reasonOrder() {
   if (!S.rorder || S.rorder.length !== REASONS.length || REASONS.some(r => !S.rorder.includes(r.id))) { S.rorder = shuffled(REASONS.map(r => r.id)); save(); }
@@ -727,8 +731,11 @@ function vM4() {
         <dl class="kv"><dt>피고인</dt><dd>박흥식</dd>
           <dt>인정된 혐의</dt><dd>${[I.main, ...I.extra].filter(Boolean).map(id => esc(LAWS[id].short + ' ' + LAWS[id].name)).join('<br>')}</dd>
           <dt>핵심 증거</dt><dd>${I.ev.map(id => esc(ev(id).title)).join('<br>')}</dd></dl>
-        <div class="lawbox"><b>제4조 법정형</b><br>${esc(LAW4_HEAD)}</div>
-        <p class="muted">여러 호가 함께 적용되어도 이 게임에서는 제4조에 정한 범위 안에서 구형해요(교육용 단순화).</p>
+        <h3 style="margin-top:14px">반민법 법정형 조문 <small class="muted">(원문)</small></h3>
+        <div class="lawbox"><b>제2조</b> ${esc(LAWS.L2.text)}</div>
+        <div class="lawbox"><b>제3조</b> ${esc(LAWS.L3.text)}</div>
+        <div class="lawbox"><b>제4조 본문</b> ${esc(LAW4_HEAD)}<br><b>7호</b> ${esc(LAWS.L47.text)}</div>
+        <p class="muted">조문마다 법정형이 달라요. 구형은 법정형 범위 안에서 해야 해요.</p>
         <div class="notice">⚖ <span><b>구형 ≠ 판결</b> 구형은 검찰관의 의견일 뿐이에요. 재판부는 구형보다 무겁게도, 가볍게도, 무죄로도 판결할 수 있어요.</span></div>
       </div>
       <div class="paper">
@@ -740,7 +747,7 @@ function vM4() {
         <div class="chips">${[['none', '몰수하지 않음'], ['part', '재산 일부 몰수'], ['all', '재산 전부 몰수']].map(([v, t]) => `<label class="chip radio"><input type="radio" name="conf" value="${v}" ${T.conf === v ? 'checked' : ''}><span class="bx"></span>${t}</label>`).join('')}</div>
         <p class="muted">제4조는 재산 몰수를 ‘할 수 있다’고 정했어요. 몰수하지 않는 것도 범위 안이에요.</p>
         <h3 style="margin-top:16px">④ 구형 이유</h3>
-        <div class="pen">${SENT_REASONS.map(r => `<label class="chip radio"><input type="radio" name="sreason" value="${r.id}" ${T.reason === r.id ? 'checked' : ''}><span class="bx"></span><span>${esc(r.text)}</span></label>`).join('')}</div>
+        <div class="pen">${sreasonOrder().map(r => `<label class="chip radio"><input type="radio" name="sreason" value="${r.id}" ${T.reason === r.id ? 'checked' : ''}><span class="bx"></span><span>${esc(r.text)}</span></label>`).join('')}</div>
         <div class="row" style="justify-content:space-between;margin-top:18px">
           <span class="muted">${chancesLeftText()}</span>
           <button class="btn red big" data-act="m4submit">⚖ 구형 의견 진술</button>
@@ -767,8 +774,8 @@ function submitM4() {
   const y = Number(T.years);
   if ((T.type === 'prison' || T.type === 'civil') && (!Number.isInteger(y) || y < 1)) { toast('기간을 1 이상의 정수로 입력해 주세요.'); return; }
   const issues = [];
-  if (T.type === 'death' || T.type === 'life') issues.push({ text: `${T.type === 'death' ? '사형' : '무기징역'}은 제4조의 법정형에 없어요. 제4조는 ‘10년 이하의 징역’ 또는 ‘15년 이하의 공민권 정지’를 정했어요. (사형·무기는 제1조~제3조에 있어요.)` });
-  if (T.type === 'prison' && y > 10) issues.push({ text: `징역 ${y}년은 법정형 범위를 벗어나요. 제4조의 징역은 10년 이하예요.` });
+  if (T.type === 'death' || T.type === 'life') issues.push({ text: `${T.type === 'death' ? '사형' : '무기징역'}은 인정된 혐의(제4조 7호)의 법정형에 없어요. 제4조는 ‘10년 이하의 징역’ 또는 ‘15년 이하의 공민권 정지’를 정했어요. (사형·무기는 제3조 같은 다른 조항의 법정형이에요. 이 사건에는 적용되지 않아요.)` });
+  if (T.type === 'prison' && y > 10) issues.push({ text: `징역 ${y}년은 법정형 범위를 벗어나요. 인정된 혐의는 제4조라서 징역은 10년 이하예요. (‘5년 이상 징역’은 제2조·제3조의 법정형이에요.)` });
   if (T.type === 'civil' && y > 15) issues.push({ text: `공민권 정지 ${y}년은 법정형 범위를 벗어나요. 제4조의 공민권 정지는 15년 이하예요.` });
   const r = SENT_REASONS.find(x => x.id === T.reason);
   if (r && !r.ok) issues.push({ text: `구형 이유: ${r.why}` });
