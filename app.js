@@ -1005,7 +1005,6 @@ function vScene(id) {
         <span class="muted">${i + 1} / ${sc.lines.length}</span>
         <div class="row">
           ${i > 0 ? '<button class="btn ghost small" data-act="vnprev">◀ 이전</button>' : ''}
-          ${!last ? '<button class="btn ghost small" data-act="vnskip">건너뛰기</button>' : ''}
           <button class="btn ${last ? 'orange' : ''} small" data-act="vnnext">${last ? (S.done[id] ? '닫기' : '계속 →') : '다음 ▶'}</button>
         </div>
       </div>
@@ -1399,7 +1398,6 @@ function bind() {
     }
     else if (a === 'vnnext') vnNext();
     else if (a === 'vnprev') { clearInterval(typer); typer = null; S.line = Math.max(0, S.line - 1); save(); render(); }
-    else if (a === 'vnskip') { clearInterval(typer); typer = null; S.line = SCENES[S.screen].lines.length - 1; save(); render(); }
     else if (a === 'organdone') advance('c1g');
     else if (a === 'trialnext') trialNext();
     else if (a === 'present') presentEvidence();
