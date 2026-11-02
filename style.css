@@ -794,3 +794,11 @@ textarea{width:100%;min-height:130px;font:16px/1.7 var(--sans);padding:14px;bord
 }
 /* 더블 탭 확대 방지 (핀치 확대는 유지) */
 html,body,button,a,label,input,select,textarea{touch-action:manipulation}
+
+/* 모바일: 대화 상자를 조금 더 위로 (주소창·하단 바에 가려지지 않게) */
+@media (max-width:640px){
+  .vn{min-height:calc(100vh - 58px - 72px);min-height:calc(100svh - 58px - 72px);padding-bottom:20px}
+  .vn-photo{margin-top:12px}
+  .vn-photo img{max-height:210px}
+  .vn-cast{padding-bottom:18px}
+}

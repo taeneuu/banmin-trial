@@ -1262,7 +1262,7 @@ function trialNext() {
 
 
 /* ---------- chapter 2: chase (tap mini-game) ---------- */
-const CHASE = { tap: 4, decay: 4, steps: [[0, 1.5], [5, 2], [6, 2.5], [7, 3]] };
+const CHASE = { tap: 4, decay: 4, steps: [[0, 1.5], [4, 2], [5, 2.5], [6, 3], [7, 3.5], [8, 4]] };
 let CH = null;
 function chaseTime() { let t = CHASE.steps[0][1]; CHASE.steps.forEach(([f, v]) => { if ((S.chaseFails || 0) >= f) t = v; }); return t; }
 function chaseNextNote() { const f = S.chaseFails || 0; const st = CHASE.steps.find(x => x[0] === f && f > 0); return st ? `이제부터 제한 시간이 ${st[1]}초로 늘어나요.` : ''; }
@@ -1276,7 +1276,7 @@ function vChase() {
     <div class="chase" id="chase">
       <div class="ch-hud">
         <div class="ch-call"><span>☎ 전화 연결까지</span><div class="ch-bar"><div id="chCall"></div></div><b id="chSec">${chaseTime().toFixed(1)}초</b></div>
-        <div class="ch-tries">${S.chaseFails ? `실패 ${S.chaseFails}번` : '첫 도전'}${S.chaseFails >= 5 ? ` · <b>제한 시간 ${chaseTime()}초</b>` : ''}</div>
+        <div class="ch-tries">${S.chaseFails ? `실패 ${S.chaseFails}번` : '첫 도전'}${S.chaseFails >= 4 ? ` · <b>제한 시간 ${chaseTime()}초</b>` : ''}</div>
       </div>
       <div class="ch-track">
         <div class="ch-floor"></div>
