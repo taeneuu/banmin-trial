@@ -751,3 +751,11 @@ textarea{width:100%;min-height:130px;font:16px/1.7 var(--sans);padding:14px;bord
 .hintbox ol{margin:6px 0 0;padding-left:20px}
 .hintbox li{margin:3px 0}
 .ch-tap{touch-action:none}
+
+/* 3장 기소장 힌트 하이라이트 */
+.chip.hl{border-color:#ffb400;background:#fff6cf;box-shadow:0 0 0 3px rgba(255,180,0,.35),0 0 18px rgba(255,190,40,.55);animation:hlpulse 1.6s ease-in-out infinite;position:relative}
+.chip.hl::after{content:"💡 힌트";position:absolute;top:-9px;right:10px;background:#ffb400;color:#3a2a00;font:800 11px var(--sans);padding:1px 8px;border-radius:999px}
+.chip.hl:has(input:checked){background:#ffe9a8}
+.hl-note{margin-top:6px;color:#ffd666;font-weight:700}
+@keyframes hlpulse{0%,100%{box-shadow:0 0 0 3px rgba(255,180,0,.35),0 0 12px rgba(255,190,40,.4)}50%{box-shadow:0 0 0 4px rgba(255,180,0,.55),0 0 24px rgba(255,190,40,.8)}}
+@media (prefers-reduced-motion:reduce){.chip.hl{animation:none}}

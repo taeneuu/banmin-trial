@@ -603,10 +603,13 @@ function vM3() {
   const { evs } = m2Pool(); const I = S.ind;
   const mainOpts = ['L47', 'L410', 'L411', 'L42', 'L2', 'L3'];
   const st = [!!I.main, I.ev.length > 0, !!I.reason];
+  const hn = Math.min(3, S.mistakes.filter(m => m.mission === 'm3').length);
+  const hl = (n, on) => (hn >= n && on) ? ' hl' : '';
   return `<section class="scene type-scene">${sceneBg('typewriter')}
   <div class="wrap enter">
     <div class="mhead"><div><span class="kicker">3장 · 특별검찰부</span><h2>기소장 작성: 법적 책임을 입증하라</h2>
-      <p>선택한 내용이 기소장에 바로 타이핑돼요. 다 고르면 <b style="color:var(--gold)">기소장 제출</b>!</p></div></div>
+      <p>선택한 내용이 기소장에 바로 타이핑돼요. 다 고르면 <b style="color:var(--gold)">기소장 제출</b>!</p>
+      ${hn ? `<p class="hl-note">💡 힌트 ${hn}/3 · <b>반짝이는 항목</b>을 살펴보세요${hn < 3 ? ' (한 번 더 틀리면 다음 힌트)' : ''}</p>` : ''}</div></div>
     <div class="ind-layout">
       <ol class="steps-v">
         ${['법 조항 선택', '증거 선택', '기소 이유'].map((t, i) => `<li class="${st[i] ? 'ok' : ''}" id="stp${i}"><i>${i + 1}</i>${t}<span class="ck">${st[i] ? '✓' : ''}</span></li>`).join('')}
@@ -618,17 +621,17 @@ function vM3() {
           <table><tr><td>사건</td><td>박흥식 반민족행위 사건</td></tr><tr><td>피고인</td><td>박흥식 (화신 사장)</td></tr><tr><td>작성</td><td>특별검찰관</td></tr></table>
         </div>
         <div class="isec"><h3><i>1</i>적용할 핵심 조항</h3>
-          <div class="chips">${mainOpts.map(id => `<label class="chip radio"><input type="radio" name="main" value="${id}" ${I.main === id ? 'checked' : ''}><span class="bx"></span><span><b>${esc(LAWS[id].short)}</b> ${esc(LAWS[id].name)}<small>${esc(LAWS[id].easy)}</small></span></label>`).join('')}</div>
+          <div class="chips">${mainOpts.map(id => `<label class="chip radio${hl(1, id === 'L47')}"><input type="radio" name="main" value="${id}" ${I.main === id ? 'checked' : ''}><span class="bx"></span><span><b>${esc(LAWS[id].short)}</b> ${esc(LAWS[id].name)}<small>${esc(LAWS[id].easy)}</small></span></label>`).join('')}</div>
           <div class="isec" style="margin:14px 0 0"><h3 style="font-size:14px">＋ 함께 적용할 보조 조항 <span class="muted">(선택)</span></h3>
             <div class="chips">${['L410', 'L411', 'L42', 'L3'].map(id => `<label class="chip"><input type="checkbox" name="extra" value="${id}" ${I.extra.includes(id) ? 'checked' : ''} ${I.main === id ? 'disabled' : ''}><span class="bx"></span><span><b>${esc(LAWS[id].short)}</b> ${esc(LAWS[id].name)}</span></label>`).join('')}</div></div>
           <div class="typed" id="tyLaw"></div>
         </div>
         <div class="isec"><h3><i>2</i>혐의를 뒷받침하는 증거 <span class="muted">(여러 개)</span></h3>
-          <div class="chips">${evs.map(id => `<label class="chip"><input type="checkbox" name="ev" value="${id}" ${I.ev.includes(id) ? 'checked' : ''}><span class="bx"></span><span>${esc(ev(id).title)}<small>${esc(ev(id).period)}</small></span></label>`).join('')}</div>
+          <div class="chips">${evs.map(id => `<label class="chip${hl(2, id === 'E1' || id === 'E2')}"><input type="checkbox" name="ev" value="${id}" ${I.ev.includes(id) ? 'checked' : ''}><span class="bx"></span><span>${esc(ev(id).title)}<small>${esc(ev(id).period)}</small></span></label>`).join('')}</div>
           <div class="typed" id="tyEv"></div>
         </div>
         <div class="isec"><h3><i>3</i>기소 이유 <span class="muted">(핵심 혐의 하나)</span></h3>
-          <div class="chips">${reasonOrder().map(r => `<label class="chip radio wide"><input type="radio" name="reason" value="${r.id}" ${I.reason === r.id ? 'checked' : ''}><span class="bx"></span><span>${esc(r.text)}</span></label>`).join('')}</div>
+          <div class="chips">${reasonOrder().map(r => `<label class="chip radio wide${hl(3, r.id === 'R1')}"><input type="radio" name="reason" value="${r.id}" ${I.reason === r.id ? 'checked' : ''}><span class="bx"></span><span>${esc(r.text)}</span></label>`).join('')}</div>
           <div class="typed" id="tyReason"></div>
         </div>
         <div class="row" style="justify-content:space-between;margin-top:18px;font-family:var(--sans)">
