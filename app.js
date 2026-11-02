@@ -626,7 +626,7 @@ function vM3() {
             <div class="chips">${['L410', 'L411', 'L42', 'L3'].map(id => `<label class="chip"><input type="checkbox" name="extra" value="${id}" ${I.extra.includes(id) ? 'checked' : ''} ${I.main === id ? 'disabled' : ''}><span class="bx"></span><span><b>${esc(LAWS[id].short)}</b> ${esc(LAWS[id].name)}</span></label>`).join('')}</div></div>
           <div class="typed" id="tyLaw"></div>
         </div>
-        <div class="isec"><h3><i>2</i>혐의를 뒷받침하는 증거 <span class="muted">(여러 개)</span></h3>
+        <div class="isec"><h3><i>2</i>혐의를 뒷받침하는 증거 <span class="muted">(여러 개)</span> <small class="dashhint">우측 상단 대시보드를 눌러 참고하세요</small></h3>
           <div class="chips">${evs.map(id => `<label class="chip${hl(2, id === 'E1' || id === 'E2')}"><input type="checkbox" name="ev" value="${id}" ${I.ev.includes(id) ? 'checked' : ''}><span class="bx"></span><span>${esc(ev(id).title)}<small>${esc(ev(id).period)}</small></span></label>`).join('')}</div>
           <div class="typed" id="tyEv"></div>
         </div>

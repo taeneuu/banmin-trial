@@ -759,3 +759,5 @@ textarea{width:100%;min-height:130px;font:16px/1.7 var(--sans);padding:14px;bord
 .hl-note{margin-top:6px;color:#ffd666;font-weight:700}
 @keyframes hlpulse{0%,100%{box-shadow:0 0 0 3px rgba(255,180,0,.35),0 0 12px rgba(255,190,40,.4)}50%{box-shadow:0 0 0 4px rgba(255,180,0,.55),0 0 24px rgba(255,190,40,.8)}}
 @media (prefers-reduced-motion:reduce){.chip.hl{animation:none}}
+
+.dashhint{font:500 12px var(--sans);color:var(--ink3);margin-left:6px;white-space:normal}
