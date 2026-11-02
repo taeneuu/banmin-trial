@@ -835,16 +835,17 @@ function vM5() {
 
     <h3 class="sect-title">마지막 질문</h3>
     <div class="paper reflect tape">
-      <p class="q">친일 행위를 입증할 증거와 처벌할 법이 있었는데도, 친일 청산은 왜 충분히 이루어지지 못했을까?</p>
-      <textarea id="reflect" placeholder="위 연표에서 찾은 근거를 들어 2~3문장으로 써 보세요. (20자 이상)">${esc(S.reflection)}</textarea>
-      <div class="row" style="justify-content:flex-end;margin-top:6px"><span class="muted" id="rcount">${S.reflection.trim().length}자</span></div>
+      <p class="q"><span class="qno">첫 번째 질문</span>친일 행위를 입증할 증거와 처벌할 법이 있었는데도, 친일 청산은 왜 충분히 이루어지지 못했을까?</p>
+      <p class="qsub">위 연표에서 찾은 근거를 1~2개 들어, 청산이 충분하지 못했던 까닭을 2~3문장으로 써 보세요.</p>
+      <textarea id="reflect" placeholder="여기에 답을 써 보세요. (20자 이상)">${esc(S.reflection)}</textarea>
+      <div class="row" style="justify-content:flex-end;margin-top:6px"><span class="muted" id="rcount" class="${S.reflection.trim().length >= 20 ? 'okc' : ''}">${S.reflection.trim().length}/20자</span></div>
       <hr class="qsep">
       <p class="q"><span class="qno">두 번째 질문</span>청산하지 못한 과거는 오늘날 우리 사회에 어떤 모습으로 남아 있을까?</p>
       <p class="qsub">아래 영상을 끝까지 본 뒤 답해 보세요. 영상 속 장면이나 내 주변의 사례(학교·거리·기업·기념물 등)를 하나 들어, 왜 ‘청산되지 못한 과거’라고 생각하는지 2~3문장으로 써 보세요.</p>
       <div class="video"><iframe src="https://www.youtube-nocookie.com/embed/_X7h3UIMHPs" title="청산하지 못한 과거 관련 영상" loading="lazy" allow="accelerometer; encrypted-media; picture-in-picture; fullscreen" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe></div>
       <p class="vlink">영상이 나오지 않으면 <a href="https://youtu.be/_X7h3UIMHPs" target="_blank" rel="noopener">유튜브에서 직접 열기</a></p>
       <textarea id="reflect2" placeholder="영상 속 장면이나 주변 사례를 들어 2~3문장으로 써 보세요. (30자 이상)">${esc(S.reflection2 || '')}</textarea>
-      <div class="row" style="justify-content:flex-end;margin-top:6px"><span class="muted" id="rcount2">${(S.reflection2 || '').trim().length}자</span></div>
+      <div class="row" style="justify-content:flex-end;margin-top:6px"><span class="muted" id="rcount2" class="${(S.reflection2 || '').trim().length >= 30 ? 'okc' : ''}">${(S.reflection2 || '').trim().length}/30자</span></div>
       <div class="submitbox">
         <label for="stuName"><b>📮 선생님께 제출하기</b><span class="muted">학번과 이름을 쓰면 답이 선생님의 기록지에 저장돼요.</span></label>
         <div class="subrow"><input id="stuName" maxlength="20" autocomplete="off" placeholder="학번 이름 (예: 10305 김하늘)" value="${esc(S.name || '')}"></div>
@@ -1401,9 +1402,9 @@ function bind() {
   const sn = $('#stuName');
   if (sn) { sn.addEventListener('input', () => { S.name = sn.value.trim(); save(); }); sn.addEventListener('keydown', e => { if (e.key === 'Enter') submitM5(); }); }
   const ta = $('#reflect');
-  if (ta) ta.addEventListener('input', () => { S.reflection = ta.value; $('#rcount').textContent = ta.value.trim().length + '자'; save(); });
+  if (ta) ta.addEventListener('input', () => { S.reflection = ta.value; const n = ta.value.trim().length; const c = $('#rcount'); c.textContent = n + '/20자'; c.classList.toggle('okc', n >= 20); save(); });
   const ta2 = $('#reflect2');
-  if (ta2) ta2.addEventListener('input', () => { S.reflection2 = ta2.value; $('#rcount2').textContent = ta2.value.trim().length + '자'; save(); });
+  if (ta2) ta2.addEventListener('input', () => { S.reflection2 = ta2.value; const n = ta2.value.trim().length; const c = $('#rcount2'); c.textContent = n + '/30자'; c.classList.toggle('okc', n >= 30); save(); });
 
   $$('[data-act]', app).forEach(b => b.addEventListener('click', () => {
     const a = b.dataset.act;

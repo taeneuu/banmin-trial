@@ -778,3 +778,5 @@ textarea{width:100%;min-height:130px;font:16px/1.7 var(--sans);padding:14px;bord
 .claim-info{margin:8px 0 0}
 .scene-info{position:fixed;left:10px;bottom:10px;z-index:5;background:rgba(0,0,0,.35);color:rgba(255,255,255,.85);border-color:rgba(255,255,255,.4);opacity:.6;margin:0}
 .orole-info{margin-top:8px;font-size:12px}
+
+#rcount.okc,#rcount2.okc{color:#2e7d32;font-weight:700}
