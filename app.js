@@ -860,15 +860,15 @@ function vM5() {
     <div class="paper reflect tape">
       <p class="q"><span class="qno">첫 번째 질문</span>친일 행위를 입증할 증거와 처벌할 법이 있었는데도, 친일 청산은 왜 충분히 이루어지지 못했을까?</p>
       <p class="qsub">위 연표에서 찾은 근거를 1~2개 들어, 청산이 충분하지 못했던 까닭을 2~3문장으로 써 보세요.</p>
-      <textarea id="reflect" placeholder="여기에 답을 써 보세요. (20자 이상)">${esc(S.reflection)}</textarea>
-      <div class="row" style="justify-content:flex-end;margin-top:6px"><span class="muted" id="rcount" class="${S.reflection.trim().length >= 20 ? 'okc' : ''}">${S.reflection.trim().length}/20자</span></div>
+      <textarea id="reflect" placeholder="여기에 답을 써 보세요. (공백 제외 50자 이상)">${esc(S.reflection)}</textarea>
+      <div class="row" style="justify-content:flex-end;margin-top:6px"><span class="muted${ansLen(S.reflection) >= MIN_ANS ? ' okc' : ''}" id="rcount">${ansLen(S.reflection)}/${MIN_ANS}자</span></div>
       <hr class="qsep">
       <p class="q"><span class="qno">두 번째 질문</span>청산하지 못한 과거는 오늘날 우리 사회에 어떤 모습으로 남아 있을까?</p>
       <p class="qsub">아래 영상을 끝까지 본 뒤 답해 보세요. 영상 속 장면이나 내 주변의 사례(학교·거리·기업·기념물 등)를 하나 들어, 왜 ‘청산되지 못한 과거’라고 생각하는지 2~3문장으로 써 보세요.</p>
       <div class="video"><iframe src="https://www.youtube-nocookie.com/embed/_X7h3UIMHPs" title="청산하지 못한 과거 관련 영상" loading="lazy" allow="accelerometer; encrypted-media; picture-in-picture; fullscreen" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe></div>
       <p class="vlink">영상이 나오지 않으면 <a href="https://youtu.be/_X7h3UIMHPs" target="_blank" rel="noopener">유튜브에서 직접 열기</a></p>
-      <textarea id="reflect2" placeholder="영상 속 장면이나 주변 사례를 들어 2~3문장으로 써 보세요. (30자 이상)">${esc(S.reflection2 || '')}</textarea>
-      <div class="row" style="justify-content:flex-end;margin-top:6px"><span class="muted" id="rcount2" class="${(S.reflection2 || '').trim().length >= 30 ? 'okc' : ''}">${(S.reflection2 || '').trim().length}/30자</span></div>
+      <textarea id="reflect2" placeholder="영상 속 장면이나 주변 사례를 들어 2~3문장으로 써 보세요. (공백 제외 50자 이상)">${esc(S.reflection2 || '')}</textarea>
+      <div class="row" style="justify-content:flex-end;margin-top:6px"><span class="muted${ansLen(S.reflection2) >= MIN_ANS ? ' okc' : ''}" id="rcount2">${ansLen(S.reflection2)}/${MIN_ANS}자</span></div>
       <div class="submitbox">
         <label for="stuName"><b>📮 선생님께 제출하기</b><span class="muted">학번과 이름을 쓰면 답이 선생님의 기록지에 저장돼요.</span></label>
         <div class="subrow"><input id="stuName" maxlength="20" autocomplete="off" placeholder="학번 이름 (예: 10305 김하늘)" value="${esc(S.name || '')}"></div>
@@ -904,6 +904,29 @@ function sendSubmission(onOk, onFail) {
     .then(() => { clearTimeout(to); const d = new Date(); S.submittedAt = `${d.getMonth() + 1}월 ${d.getDate()}일 ${d.getHours()}시 ${String(d.getMinutes()).padStart(2, '0')}분`; save(); onOk(); })
     .catch(() => { clearTimeout(to); onFail(); });
 }
+const MIN_ANS = 50;
+const ansLen = s => (s || '').replace(/\s/g, '').length;
+// 성의 없는 답변 검사: 문제가 있으면 안내 문구, 없으면 ''
+function checkAnswer(raw, label) {
+  const t = (raw || '').trim(), c = t.replace(/\s/g, '');
+  if (c.length < MIN_ANS) return `${label} 질문은 공백을 뺀 ${MIN_ANS}자 이상 써야 제출할 수 있어요. (지금 ${c.length}자)`;
+  const syl = (c.match(/[가-힣]/g) || []).length, jamo = (c.match(/[ㄱ-ㅣ]/g) || []).length;
+  if (jamo / c.length > 0.1 || syl / c.length < 0.7) return `${label} 질문: 자음·모음만 있거나 한글이 아닌 글자가 너무 많아요. 완성된 한글 문장으로 써 주세요.`;
+  const freq = {}; let top = 0;
+  for (const ch of c) { freq[ch] = (freq[ch] || 0) + 1; if (freq[ch] > top) top = freq[ch]; }
+  if (/(.)\1{3,}/.test(c) || top / c.length > 0.3 || Object.keys(freq).length < 15) return `${label} 질문: 같은 글자가 반복되고 있어요. 내 생각을 문장으로 써 주세요.`;
+  if (t.split(/\s+/).length < 8) return `${label} 질문: 띄어쓰기를 하며 문장으로 써 주세요. (8어절 이상)`;
+  return '';
+}
+function similarAnswers(a, b) {
+  const n = s => (s || '').replace(/[^가-힣a-zA-Z0-9]/g, '');
+  const x = n(a), y = n(b);
+  if (!x || !y) return false;
+  if (x === y || x.includes(y) || y.includes(x)) return true;
+  const bg = s => { const r = new Set(); for (let i = 0; i < s.length - 1; i++) r.add(s.slice(i, i + 2)); return r; };
+  const A = bg(x), B = bg(y); let inter = 0; A.forEach(g => { if (B.has(g)) inter++; });
+  return inter / (A.size + B.size - inter) >= 0.8;
+}
 function submitM5() {
   if (S.submittedAt) { finishCase(); return; }
   const t = ($('#reflect').value || '').trim();
@@ -911,8 +934,9 @@ function submitM5() {
   const t2 = ($('#reflect2').value || '').trim();
   S.reflection = t; S.reflection2 = t2; S.name = nm; save();
   const msg = $('#submsg'), btn = $('#m5btn');
-  if (t.length < 20) { toast('첫 번째 질문은 20자 이상 써야 제출할 수 있어요.'); $('#reflect').classList.add('shake'); return; }
-  if (t2.length < 30) { toast('두 번째 질문은 30자 이상 써야 제출할 수 있어요.'); $('#reflect2').classList.add('shake'); return; }
+  const e1 = checkAnswer(t, '첫 번째'); if (e1) { toast(e1); $('#reflect').classList.add('shake'); return; }
+  const e2 = checkAnswer(t2, '두 번째'); if (e2) { toast(e2); $('#reflect2').classList.add('shake'); return; }
+  if (similarAnswers(t, t2)) { toast('두 질문에 거의 같은 내용을 썼어요. 질문마다 내 생각을 따로 써 주세요.'); $('#reflect2').classList.add('shake'); return; }
   if (nm.length < 2 || !/\d/.test(nm)) { msg.className = 'submsg no'; msg.textContent = '학번과 이름을 함께 써 주세요. (예: 10305 김하늘)'; $('#stuName').focus(); $('#stuName').classList.add('shake'); return; }
   btn.disabled = true; btn.textContent = '보내는 중…'; msg.className = 'submsg'; msg.textContent = '잠시만 기다려 주세요.';
   sendSubmission(() => { toast('선생님께 제출했어요!'); finishCase(); }, () => {
@@ -1424,9 +1448,9 @@ function bind() {
   const sn = $('#stuName');
   if (sn) { sn.addEventListener('input', () => { S.name = sn.value.trim(); save(); }); sn.addEventListener('keydown', e => { if (e.key === 'Enter') submitM5(); }); }
   const ta = $('#reflect');
-  if (ta) ta.addEventListener('input', () => { S.reflection = ta.value; const n = ta.value.trim().length; const c = $('#rcount'); c.textContent = n + '/20자'; c.classList.toggle('okc', n >= 20); save(); });
+  if (ta) ta.addEventListener('input', () => { S.reflection = ta.value; const n = ansLen(ta.value); const c = $('#rcount'); c.textContent = n + `/${MIN_ANS}자`; c.classList.toggle('okc', n >= MIN_ANS); save(); });
   const ta2 = $('#reflect2');
-  if (ta2) ta2.addEventListener('input', () => { S.reflection2 = ta2.value; const n = ta2.value.trim().length; const c = $('#rcount2'); c.textContent = n + '/30자'; c.classList.toggle('okc', n >= 30); save(); });
+  if (ta2) ta2.addEventListener('input', () => { S.reflection2 = ta2.value; const n = ansLen(ta2.value); const c = $('#rcount2'); c.textContent = n + `/${MIN_ANS}자`; c.classList.toggle('okc', n >= MIN_ANS); save(); });
 
   $$('[data-act]', app).forEach(b => b.addEventListener('click', () => {
     const a = b.dataset.act;
