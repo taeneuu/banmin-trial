@@ -778,7 +778,11 @@ function submitM4() {
   if (T.type === 'prison' && y > 10) issues.push({ text: `징역 ${y}년은 법정형 범위를 벗어나요. 인정된 혐의는 제4조라서 징역은 10년 이하예요. (‘5년 이상 징역’은 제2조·제3조의 법정형이에요.)` });
   if (T.type === 'civil' && y > 15) issues.push({ text: `공민권 정지 ${y}년은 법정형 범위를 벗어나요. 제4조의 공민권 정지는 15년 이하예요.` });
   const r = SENT_REASONS.find(x => x.id === T.reason);
-  if (r && !r.ok) issues.push({ text: `구형 이유: ${r.why}` });
+  if (r && r.id === 'S3') {
+    const ex = S.ind.extra || [];
+    const unc = [...(ex.includes('L410') ? [] : ['단체 간부 활동']), ...(ex.includes('L411') ? [] : ['전쟁 협력 글']), '헌금'];
+    issues.push({ text: `구형 이유: 기소장에 혐의로 적지 않은 행적(${unc.join('·')})까지 형을 무겁게 하는 근거로 쓸 수 없어요. 구형은 기소장에 적은 혐의와 그 증거를 기준으로 해요.` });
+  } else if (r && !r.ok) issues.push({ text: `구형 이유: ${r.why}` });
   if (!issues.length) {
     save();
     winModal('구형 완료', '법정형 범위 안의 구형', `<p class="sub">당신의 구형: <b>${esc(sentenceText())}</b></p>
@@ -1225,10 +1229,9 @@ function loseHp(why, issueText) {
   if (T.hp > 0) { render(); const c = $('.tfeed') || $('.rebut.wrong:last-of-type'); if (c) c.classList.add('shake'); return; }
   const R = TRIAL[T.round];
   const issues = [{ text: `반박 ${T.round + 1}(${R.type === 'testimony' ? '증언 흔들기' : R.claim.slice(0, 24) + '…'}): ${issueText || why}` }];
-  spend('trial', issues);
   S.trial = { round: 0, hp: TRIAL_HP, wrong: [], solved: false }; timerRound = -1; save();
-  if (S.failed) { render(); return; }
-  failModal('bad', '재판부가 공판을 연기했어요', [{ text: '설득력을 모두 잃었어요. 첫 번째 반박부터 다시 시작해요.' }, ...issues],
+  modal(`<div class="modal-hero">${mascot('', 'sad', 100, false)}<div><span class="res bad">공판 연기</span><h2 class="mt">재판부가 공판을 연기했어요</h2>
+    <p class="sub">설득력을 모두 잃었어요. 첫 번째 반박부터 다시 시작해요. <b>보완 조사 기회는 줄지 않아요.</b></p></div></div>${fixList(issues)}`,
     [{ text: '조사 기록 다시 보기', cls: 'ghost', fn: () => go('m1') }, { text: '공판 다시 시작', cls: 'orange', fn: render }]);
 }
 function solveRound() { const T = S.trial; T.solved = true; T.lastWhy = null; stopRoundTimers(); save(); flash(); render(); }
@@ -1278,11 +1281,11 @@ function vChase() {
   return `<section class="scene chase-scene">${sceneBg('hwashin')}
   <div class="wrap enter">
     <div class="mhead"><div><span class="kicker">2장 · 특별조사위원회</span><h2>사장실 추격!</h2>
-      <p>박흥식이 비밀문으로 빠져나가 어딘가에 연락하려 해요. <b style="color:var(--gold)">화면을 빠르게 연타</b>해서 전화가 연결되기 전에 따라잡으세요!</p></div>
+      <p>박흥식이 비밀문 너머 다른 방에서 어딘가에 구원을 요청하고 있어요. <b style="color:var(--gold)">화면을 빠르게 연타</b>해서 통화를 마치고 달아나기 전에 따라잡으세요!</p></div>
       <span class="tag illut">교육용 재구성 · 미니게임</span></div>
     <div class="chase" id="chase">
       <div class="ch-hud">
-        <div class="ch-call"><span>☎ 전화 연결까지</span><div class="ch-bar"><div id="chCall"></div></div><b id="chSec">${chaseTime().toFixed(1)}초</b></div>
+        <div class="ch-call"><span>☎ 통화가 끝나기까지</span><div class="ch-bar"><div id="chCall"></div></div><b id="chSec">${chaseTime().toFixed(1)}초</b></div>
         <div class="ch-tries">${S.chaseFails ? `실패 ${S.chaseFails}번` : '첫 도전'}${S.chaseFails >= 4 ? ` · <b>제한 시간 ${chaseTime()}초</b>` : ''}</div>
       </div>
       <div class="ch-track">
@@ -1371,7 +1374,7 @@ function chaseEnd(win) {
     S.chaseFails = (S.chaseFails || 0) + 1; save();
     ov.className = 'ch-over fail';
     ov.innerHTML = `<div class="ch-res"><div class="obj-stamp fail">놓쳤다!</div>
-      <p>전화가 연결되고 말았어요. 처음부터 다시 쫓아가요!</p>
+      <p>통화를 마친 박흥식이 또 빠져나갔어요. 처음부터 다시 쫓아가요!</p>
       ${chaseNextNote() ? `<p class="easy">${chaseNextNote()}</p>` : ''}
       <button class="btn orange" id="chRetry">다시 도전</button></div>`;
     $('#chRetry').addEventListener('click', () => render());
