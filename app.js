@@ -213,14 +213,20 @@ function renderHud() {
   $('#hudLockerTxt').textContent = onDash ? '← 돌아가기' : '대시보드 · 증거';
   $('#hudLocker').setAttribute('aria-label', onDash ? '하던 곳으로 돌아가기' : '사건 대시보드와 증거 보관함 열기');
 }
-let returnTo = null, returnLine = null;
+let returnTo = null, returnLine = null, returnScroll = 0;
 $('#hudLocker').addEventListener('click', () => {
   if (S.screen === 'dash' && !S.failed) {
     const back = returnTo && returnTo !== 'dash' ? returnTo : (S.done.m5 ? 'end' : curId());
     go(back, true, back === returnTo && returnLine !== null);
     if (back === returnTo && returnLine !== null && stepOf(back) && stepOf(back).type === 'scene') { S.line = returnLine; save(); render(); }
+    if (back === returnTo && returnScroll) {
+      const y = returnScroll;
+      const to = () => window.scrollTo({ top: y, behavior: 'instant' });
+      to(); requestAnimationFrame(to); setTimeout(to, 120); setTimeout(to, 400);
+    }
     return;
   }
+  returnScroll = S.failed ? 0 : window.scrollY;
   returnTo = S.failed ? null : S.screen;
   returnLine = stepOf(S.screen) && stepOf(S.screen).type === 'scene' ? S.line : null;
   go('dash');
